@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default" data-assets-path="/assets/">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PAD — Presidential Action Desk: Electronic Document Routing, Tracking, and Executive Action System." />
+    <meta name="theme-color" content="#0a6b45" />
+    <title>PAD | Electronic Document Routing, Tracking, and Executive Action System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/vendor/fonts/boxicons.css" />
+    <link rel="stylesheet" href="/assets/vendor/css/core.css" />
+    <link rel="stylesheet" href="/assets/vendor/css/theme-default.css" />
+    <link rel="stylesheet" href="/assets/css/demo.css" />
+    <link rel="stylesheet" href="/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main id="auth-view" class="auth-shell">
+      <section class="auth-story" aria-labelledby="auth-story-title">
+        <div class="auth-story-content">
+          <div class="auth-university">
+            <span class="auth-crest" aria-hidden="true"><i class="bx bx-buildings"></i></span>
+            <span>Sultan Kudarat State University</span>
+          </div>
+          <div class="auth-story-copy">
+            <p class="auth-kicker">PAD · PRESIDENTIAL ACTION DESK</p>
+            <h1 id="auth-story-title">Electronic Document Routing, Tracking, and <span>Executive Action System.</span></h1>
+            <p>PAD keeps official documents moving from receipt to executive action, signature, and release with a complete record at every handoff.</p>
+          </div>
+          <div class="auth-flow" aria-label="Document routing flow">
+            <div class="auth-flow-step">
+              <span class="auth-flow-icon"><i class="bx bx-inbox"></i></span>
+              <span><strong>Receive</strong><small>Records Office</small></span>
+            </div>
+            <i class="bx bx-right-arrow-alt auth-flow-arrow" aria-hidden="true"></i>
+            <div class="auth-flow-step">
+              <span class="auth-flow-icon"><i class="bx bx-pen"></i></span>
+              <span><strong>Action</strong><small>Presidential Desk</small></span>
+            </div>
+            <i class="bx bx-right-arrow-alt auth-flow-arrow" aria-hidden="true"></i>
+            <div class="auth-flow-step">
+              <span class="auth-flow-icon"><i class="bx bx-send"></i></span>
+              <span><strong>Release</strong><small>Owner Office</small></span>
+            </div>
+          </div>
+        </div>
+        <p class="auth-story-footer"><i class="bx bx-shield-quarter"></i> Secure, accountable, and traceable.</p>
+      </section>
+
+      <section class="auth-access" aria-label="PAD sign in">
+        <div class="auth-card card">
+          <div class="auth-mobile-brand">
+            <span class="auth-mark" aria-hidden="true"><i class="bx bx-transfer-alt"></i></span>
+            <span class="brand-copy"><strong>PAD</strong><small>Presidential Action Desk</small></span>
+          </div>
+          <p class="eyebrow">SECURE STAFF ACCESS</p>
+          <h1>Welcome to PAD</h1>
+          <p class="auth-system-name">Presidential Action Desk</p>
+          <p class="auth-copy">Electronic Document Routing, Tracking, and Executive Action System. Sign in with your authorized university Google account to continue.</p>
+          <div class="auth-signin-panel">
+            <div id="google-signin" class="google-signin" aria-live="polite">
+              <button id="google-signin-placeholder" class="google-button-placeholder" type="button" disabled>
+                <span class="google-letter" aria-hidden="true">G</span>
+                Continue with Google
+              </button>
+            </div>
+            <p id="auth-status" class="auth-status">Preparing secure Google sign-in...</p>
+          </div>
+          <div class="auth-access-note">
+            <i class="bx bx-lock-alt" aria-hidden="true"></i>
+            <span>Access is limited to email addresses approved by the Records Office.</span>
+          </div>
+          <p class="auth-help">Having trouble signing in? Contact the Records Office for access.</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="app-view" class="layout-wrapper layout-content-navbar d-none">
+      <div class="layout-container">
+        <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+          <div class="app-brand demo">
+            <a class="app-brand-link" href="#dashboard" data-section="dashboard">
+              <span class="brand-icon"><i class="bx bx-transfer-alt"></i></span>
+              <span class="app-brand-text menu-text ms-2"><span>PAD</span><small>Presidential Action Desk</small></span>
+            </a>
+            <a href="javascript:void(0)" class="layout-menu-toggle menu-link text-large ms-auto d-block d-xl-none" aria-label="Toggle menu">
+              <i class="bx bx-chevron-left bx-sm align-middle"></i>
+            </a>
+          </div>
+          <div class="menu-inner-shadow"></div>
+          <ul class="menu-inner py-1">
+            <li class="menu-header small text-uppercase"><span class="menu-header-text">Workspace</span></li>
+            <li class="menu-item active" data-nav="dashboard">
+              <a href="#dashboard" class="menu-link" data-section="dashboard"><i class="menu-icon tf-icons bx bx-grid-alt"></i><div>Overview</div></a>
+            </li>
+            <li class="menu-item" data-nav="documents">
+              <a href="#documents" class="menu-link" data-section="documents"><i class="menu-icon tf-icons bx bx-folder-open"></i><div>Documents</div></a>
+            </li>
+            <li class="menu-item" data-nav="track">
+              <a href="#track" class="menu-link" data-section="track"><i class="menu-icon tf-icons bx bx-map-alt"></i><div>Track a document</div></a>
+            </li>
+            <li id="admin-nav-item" class="menu-item d-none" data-nav="admin">
+              <a href="#admin" class="menu-link" data-section="admin"><i class="menu-icon tf-icons bx bx-shield-quarter"></i><div>Administration</div></a>
+            </li>
+            <li class="menu-header small text-uppercase"><span class="menu-header-text">Operations</span></li>
+            <li class="menu-item">
+              <button class="menu-link border-0 bg-transparent w-100 text-start" id="new-document-button" type="button"><i class="menu-icon tf-icons bx bx-upload"></i><div>Receive / upload</div></button>
+            </li>
+          </ul>
+          <div class="menu-footer px-3 pb-3"><span class="badge bg-label-success">Executive action system</span></div>
+        </aside>
+
+        <div class="layout-page">
+          <nav class="layout-navbar container-xxl navbar navbar-expand-xl navbar-detached align-items-center bg-navbar-theme" id="layout-navbar">
+            <div class="layout-menu-toggle navbar-nav align-items-xl-center me-3 me-xl-0 d-xl-none">
+              <a class="nav-item nav-link px-0 me-xl-4" href="javascript:void(0)"><i class="bx bx-menu bx-sm"></i></a>
+            </div>
+            <div class="navbar-nav-right d-flex align-items-center ms-auto" id="navbar-collapse">
+              <div class="nav-item d-flex align-items-center me-3"><span id="api-state" class="connection-state"><i class="bx bx-radio-circle-marked"></i> Connected</span></div>
+              <div class="navbar-nav flex-row align-items-center ms-auto">
+                <div class="nav-item navbar-dropdown dropdown-user dropdown">
+                  <a class="nav-link dropdown-toggle hide-arrow" href="javascript:void(0);" data-bs-toggle="dropdown" aria-label="Account menu">
+                    <div class="avatar avatar-online"><img id="user-avatar" class="w-px-40 h-auto rounded-circle d-none" alt="" /><span id="user-initials" class="avatar-initial rounded-circle bg-label-success">PA</span></div>
+                  </a>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><div class="dropdown-item"><div class="d-flex"><div class="flex-grow-1"><span id="user-name" class="fw-semibold d-block">User</span><small id="user-office" class="text-muted">Loading profile…</small></div></div></div></li>
+                    <li><div class="dropdown-divider"></div></li>
+                    <li><button id="logout-button" class="dropdown-item" type="button"><i class="bx bx-power-off me-2"></i><span>Sign out</span></button></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          <div class="content-wrapper">
+            <div class="container-xxl flex-grow-1 container-p-y">
+              <div id="notice" class="alert d-none" role="alert"></div>
+
+              <section id="section-dashboard" class="app-section">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+                  <div><p class="eyebrow mb-1">PAD EXECUTIVE DOCUMENT CONTROL</p><h4 class="fw-bold mb-1">Good day, <span id="greeting-name">colleague</span>.</h4><p class="mb-0 text-muted">Keep each document moving with a complete, visible trail.</p></div>
+                  <button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-upload me-1"></i> Receive / upload</button>
+                </div>
+                <div class="row g-4 mb-4">
+                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon success"><i class="bx bx-folder"></i></span><p class="mb-1 text-muted">All visible documents</p><h3 id="metric-total" class="mb-0">—</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-transfer"></i></span><p class="mb-1 text-muted">In transit</p><h3 id="metric-transit" class="mb-0">—</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon forest"><i class="bx bx-check-double"></i></span><p class="mb-1 text-muted">Received</p><h3 id="metric-received" class="mb-0">—</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon muted"><i class="bx bx-time-five"></i></span><p class="mb-1 text-muted">New / created</p><h3 id="metric-created" class="mb-0">—</h3></div></div></div>
+                </div>
+                <div class="card"><div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2"><div><h5 class="mb-1">Recent document activity</h5><small class="text-muted">The latest documents available to your office.</small></div><button class="btn btn-sm btn-outline-primary" type="button" data-section="documents">View all</button></div><div class="table-responsive text-nowrap"><table class="table table-hover"><thead><tr><th>Reference</th><th>Document</th><th>Current location</th><th>Status</th><th>Updated</th></tr></thead><tbody id="recent-documents"><tr><td colspan="5" class="text-center text-muted py-4">Loading documents…</td></tr></tbody></table></div></div>
+              </section>
+
+              <section id="section-documents" class="app-section d-none">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4"><div><p class="eyebrow mb-1">REGISTRY</p><h4 class="fw-bold mb-1">Documents</h4><p class="mb-0 text-muted">Search the documents currently available to your office.</p></div><button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-upload me-1"></i> Receive / upload</button></div>
+                <div class="card"><div class="card-header"><div class="row g-3"><div class="col-md-7"><label class="visually-hidden" for="document-search">Search documents</label><div class="input-group input-group-merge"><span class="input-group-text"><i class="bx bx-search"></i></span><input id="document-search" class="form-control" type="search" placeholder="Search reference, subject, or office" /></div></div><div class="col-md-5"><select id="status-filter" class="form-select"><option value="">All statuses</option><option value="created">Created</option><option value="in_transit">In transit</option><option value="received">Received</option><option value="completed">Completed</option></select></div></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Reference</th><th>Document</th><th>From</th><th>Current location</th><th>Status</th><th></th></tr></thead><tbody id="document-list"><tr><td colspan="6" class="text-center text-muted py-5">Loading documents…</td></tr></tbody></table></div></div>
+              </section>
+
+              <section id="section-track" class="app-section d-none">
+                <div class="mb-4"><p class="eyebrow mb-1">CHAIN OF CUSTODY</p><h4 class="fw-bold mb-1">Track a document</h4><p class="text-muted mb-0">Open a document from your registry to see every recorded handoff and receipt.</p></div>
+                <div id="document-detail" class="card empty-detail"><div class="card-body text-center py-5"><div class="empty-icon"><i class="bx bx-map-alt"></i></div><h5>Choose a document to track</h5><p class="text-muted mb-0">Select <strong>View trail</strong> from the Documents registry.</p></div></div>
+              </section>
+              <section id="section-admin" class="app-section d-none">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+                  <div>
+                    <p class="eyebrow mb-1">SYSTEM CONTROL</p>
+                    <h4 class="fw-bold mb-1">Administration</h4>
+                    <p class="mb-0 text-muted">Manage PAD roles, office assignments, and the approved-account view.</p>
+                  </div>
+                  <button id="admin-refresh" type="button" class="btn btn-outline-primary"><i class="bx bx-refresh me-1"></i> Refresh data</button>
+                </div>
+
+                <div class="row g-4 mb-4">
+                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon success"><i class="bx bx-user"></i></span><p class="mb-1 text-muted">Registered staff</p><h3 id="admin-users-total" class="mb-0">-</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon forest"><i class="bx bx-user-check"></i></span><p class="mb-1 text-muted">Active accounts</p><h3 id="admin-users-active" class="mb-0">-</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-buildings"></i></span><p class="mb-1 text-muted">Active offices</p><h3 id="admin-offices-total" class="mb-0">-</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon muted"><i class="bx bx-folder"></i></span><p class="mb-1 text-muted">Tracked documents</p><h3 id="admin-documents-total" class="mb-0">-</h3></div></div></div>
+                </div>
+
+                <div class="card mb-4">
+                  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div><h5 class="mb-1">User access</h5><small class="text-muted">Assign roles, offices, and account status after an approved user signs in for the first time.</small></div>
+                    <span class="badge bg-label-success">Administrator only</span>
+                  </div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>User</th><th>Role</th><th>Office</th><th>Access</th><th>Last sign-in</th><th></th></tr></thead><tbody id="admin-users-list"><tr><td colspan="6" class="text-center text-muted py-5">Loading user access...</td></tr></tbody></table></div>
+                </div>
+
+                <div class="row g-4">
+                  <div class="col-xl-7">
+                    <div class="card h-100">
+                      <div class="card-header"><h5 class="mb-1">Office directory</h5><small class="text-muted">Active offices are available as routing destinations.</small></div>
+                      <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Office</th><th>Assigned staff</th><th>Status</th><th></th></tr></thead><tbody id="admin-offices-list"><tr><td colspan="4" class="text-center text-muted py-5">Loading offices...</td></tr></tbody></table></div>
+                    </div>
+                  </div>
+                  <div class="col-xl-5">
+                    <div class="card h-100">
+                      <div class="card-header"><h5 class="mb-1">Add an office</h5><small class="text-muted">Use a short, permanent code for document routing.</small></div>
+                      <form id="admin-office-form" class="card-body">
+                        <div class="mb-3"><label class="form-label" for="admin-office-code">Office code</label><input id="admin-office-code" name="code" class="form-control text-uppercase" maxlength="30" required placeholder="Example: CAS" /></div>
+                        <div class="mb-3"><label class="form-label" for="admin-office-name">Office name</label><input id="admin-office-name" name="name" class="form-control" maxlength="160" required placeholder="Example: College of Arts and Sciences" /></div>
+                        <div class="mb-3"><label class="form-label" for="admin-office-description">Description</label><textarea id="admin-office-description" name="description" class="form-control" rows="3" maxlength="255" placeholder="Optional routing description"></textarea></div>
+                        <button id="admin-office-submit" type="submit" class="btn btn-primary w-100"><i class="bx bx-plus me-1"></i> Add office</button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card mt-4">
+                  <div class="card-header"><h5 class="mb-1">Approved Google accounts</h5><small class="text-muted">This is the existing tblaccount email allow-list. PAD shows it but does not modify legacy account records.</small></div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Approved email</th><th>PAD profile</th></tr></thead><tbody id="admin-access-list"><tr><td colspan="2" class="text-center text-muted py-5">Loading approved accounts...</td></tr></tbody></table></div>
+                </div>
+              </section>
+            </div>
+            <footer class="content-footer footer bg-footer-theme"><div class="container-xxl d-flex flex-wrap justify-content-between gap-2 py-3"><span><strong>PAD</strong> · Presidential Action Desk · Electronic Document Routing, Tracking, and Executive Action System</span><span id="footer-year"></span></div></footer>
+          </div>
+          <div class="content-backdrop fade"></div>
+        </div>
+      </div>
+      <div class="layout-overlay layout-menu-toggle"></div>
+    </div>
+
+    <div class="modal fade" id="upload-modal" tabindex="-1" aria-labelledby="upload-modal-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form id="upload-form"><div class="modal-header"><div><p class="eyebrow mb-1">REGISTER DOCUMENT</p><h5 id="upload-modal-title" class="modal-title">Receive or upload a document</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="alert alert-warning small"><i class="bx bx-info-circle me-1"></i>Outside documents are received by the Records Office first. Use <strong>Office document</strong> for documents your office is sending.</div><div class="row g-3"><div class="col-md-6"><label class="form-label" for="origin-type">Document source</label><select id="origin-type" name="origin_type" class="form-select"><option value="external">Outside / external document</option><option value="office">Office document</option></select></div><div class="col-md-6" id="external-sender-field"><label class="form-label" for="external-sender">External sender</label><input id="external-sender" name="external_sender" class="form-control" maxlength="255" placeholder="Agency, organization, or person" /></div><div class="col-12"><label class="form-label" for="document-subject">Subject <span class="text-danger">*</span></label><input id="document-subject" name="subject" class="form-control" maxlength="255" required placeholder="Brief document subject" /></div><div class="col-12"><label class="form-label" for="document-description">Description / routing note</label><textarea id="document-description" name="description" class="form-control" rows="3" placeholder="Optional context for the receiving office"></textarea></div><div class="col-md-6"><label class="form-label" for="recipient-office">Intended final office</label><select id="recipient-office" name="recipient_office_id" class="form-select"><option value="">Select an office (optional)</option></select></div><div class="col-md-6"><label class="form-label" for="document-file">Document file <span class="text-danger">*</span></label><input id="document-file" name="file" class="form-control" type="file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" /><small class="text-muted">PDF, Word, Excel, JPG or PNG · max 10 MB</small></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="upload-submit" type="submit" class="btn btn-primary"><i class="bx bx-upload me-1"></i> Save document</button></div></form></div></div></div>
+
+    <script src="/assets/vendor/js/helpers.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/vendor/libs/jquery/jquery.js"></script>
+    <script src="/assets/vendor/libs/popper/popper.js"></script>
+    <script src="/assets/vendor/js/bootstrap.js"></script>
+    <script src="/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.js"></script>
+    <script src="/assets/vendor/js/menu.js"></script>
+    <script src="/assets/js/main.js"></script>
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>

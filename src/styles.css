@@ -102,6 +102,9 @@ body { background: #f7f8f7; color: var(--ct-ink); }
 .admin-stat { height: 100%; border: 0; box-shadow: 0 .1rem .6rem rgba(34, 48, 62, .06); }
 .admin-select { min-width: 7.5rem; }
 #section-admin .reference-number { display: inline-block; margin-top: .15rem; }
+#admin-offices-list td:first-child { min-width: 15rem; }
+#admin-offices-list td:nth-child(3) { min-width: 20rem; }
+#admin-users-list td:first-child { min-width: 15rem; }
 
 @media (max-width: 1199.98px) { .menu-footer { position: static; } }
 @media (max-width: 575.98px) { .auth-card { padding: 2rem 1.5rem; } .navbar-detached { margin: 0; } .content-wrapper > .container-xxl { padding-left: 1rem; padding-right: 1rem; } }

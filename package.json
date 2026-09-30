@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host localhost --port 5174 --strictPort",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host localhost --port 5174 --strictPort",
+    "test:auth": "node --test tests/auth.test.js"
   },
   "devDependencies": {
     "vite": "^5.4.0"

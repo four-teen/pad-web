@@ -163,52 +163,34 @@
               </section>
               <section id="section-admin" class="app-section d-none">
                 <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
-                  <div>
-                    <p class="eyebrow mb-1">SYSTEM CONTROL</p>
-                    <h4 class="fw-bold mb-1">Administration</h4>
-                    <p class="mb-0 text-muted">Manage PAD roles, office assignments, and the approved-account view.</p>
-                  </div>
+                  <div><p class="eyebrow mb-1">SYSTEM CONTROL</p><h4 class="fw-bold mb-1">Administration</h4><p class="mb-0 text-muted">Manage Google account access and the offices available for document routing.</p></div>
                   <button id="admin-refresh" type="button" class="btn btn-outline-primary"><i class="bx bx-refresh me-1"></i> Refresh data</button>
                 </div>
-
                 <div class="row g-4 mb-4">
-                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon success"><i class="bx bx-user"></i></span><p class="mb-1 text-muted">Registered staff</p><h3 id="admin-users-total" class="mb-0">-</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon success"><i class="bx bx-user"></i></span><p class="mb-1 text-muted">Approved accounts</p><h3 id="admin-users-total" class="mb-0">-</h3></div></div></div>
                   <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon forest"><i class="bx bx-user-check"></i></span><p class="mb-1 text-muted">Active accounts</p><h3 id="admin-users-active" class="mb-0">-</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-buildings"></i></span><p class="mb-1 text-muted">Active offices</p><h3 id="admin-offices-total" class="mb-0">-</h3></div></div></div>
+                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-buildings"></i></span><p class="mb-1 text-muted">Routing offices</p><h3 id="admin-offices-total" class="mb-0">-</h3></div></div></div>
                   <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon muted"><i class="bx bx-folder"></i></span><p class="mb-1 text-muted">Tracked documents</p><h3 id="admin-documents-total" class="mb-0">-</h3></div></div></div>
                 </div>
-
-                <div class="card mb-4">
-                  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <div><h5 class="mb-1">User access</h5><small class="text-muted">Assign roles, offices, and account status after an approved user signs in for the first time.</small></div>
-                    <span class="badge bg-label-success">Administrator only</span>
-                  </div>
-                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>User</th><th>Role</th><th>Office</th><th>Access</th><th>Last sign-in</th><th></th></tr></thead><tbody id="admin-users-list"><tr><td colspan="6" class="text-center text-muted py-5">Loading user access...</td></tr></tbody></table></div>
+                <div class="nav nav-pills gap-2 mb-4" aria-label="Administration modules">
+                  <button type="button" class="nav-link active" data-admin-tab="accounts" aria-pressed="true"><i class="bx bx-user me-1"></i> Account management</button>
+                  <button type="button" class="nav-link" data-admin-tab="offices" aria-pressed="false"><i class="bx bx-buildings me-1"></i> Routing offices</button>
                 </div>
-
-                <div class="row g-4">
-                  <div class="col-xl-7">
-                    <div class="card h-100">
-                      <div class="card-header"><h5 class="mb-1">Office directory</h5><small class="text-muted">Active offices are available as routing destinations.</small></div>
-                      <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Office</th><th>Assigned staff</th><th>Status</th><th></th></tr></thead><tbody id="admin-offices-list"><tr><td colspan="4" class="text-center text-muted py-5">Loading offices...</td></tr></tbody></table></div>
-                    </div>
+                <div id="admin-accounts-panel" class="card">
+                  <div class="card-header">
+                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Account management</h5><small class="text-muted">Approve a Google email, assign its role and office, or disable PAD access.</small></div><button id="admin-add-account" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add account</button></div>
+                    <div class="row g-2"><div class="col-md-8"><label class="visually-hidden" for="admin-account-search">Search accounts</label><input id="admin-account-search" type="search" class="form-control" placeholder="Search name, email, role, or office" /></div><div class="col-md-4"><label class="visually-hidden" for="admin-account-status">Filter account status</label><select id="admin-account-status" class="form-select"><option value="">All accounts</option><option value="active">Active</option><option value="disabled">Disabled</option><option value="pending">Not signed in yet</option></select></div></div>
                   </div>
-                  <div class="col-xl-5">
-                    <div class="card h-100">
-                      <div class="card-header"><h5 class="mb-1">Add an office</h5><small class="text-muted">Use a short, permanent code for document routing.</small></div>
-                      <form id="admin-office-form" class="card-body">
-                        <div class="mb-3"><label class="form-label" for="admin-office-code">Office code</label><input id="admin-office-code" name="code" class="form-control text-uppercase" maxlength="30" required placeholder="Example: CAS" /></div>
-                        <div class="mb-3"><label class="form-label" for="admin-office-name">Office name</label><input id="admin-office-name" name="name" class="form-control" maxlength="160" required placeholder="Example: College of Arts and Sciences" /></div>
-                        <div class="mb-3"><label class="form-label" for="admin-office-description">Description</label><textarea id="admin-office-description" name="description" class="form-control" rows="3" maxlength="255" placeholder="Optional routing description"></textarea></div>
-                        <button id="admin-office-submit" type="submit" class="btn btn-primary w-100"><i class="bx bx-plus me-1"></i> Add office</button>
-                      </form>
-                    </div>
-                  </div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Account</th><th>Role</th><th>Office</th><th>Access</th><th>Last sign-in</th><th>Actions</th></tr></thead><tbody id="admin-users-list"></tbody></table></div>
+                  <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-account-count" class="text-muted"></small><div class="btn-group"><button id="admin-account-prev" class="btn btn-sm btn-outline-secondary" type="button" data-account-page="-1">Previous</button><button id="admin-account-next" class="btn btn-sm btn-outline-secondary" type="button" data-account-page="1">Next</button></div></div>
                 </div>
-
-                <div class="card mt-4">
-                  <div class="card-header"><h5 class="mb-1">Approved Google accounts</h5><small class="text-muted">This is the existing tblaccount email allow-list. PAD shows it but does not modify legacy account records.</small></div>
-                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Approved email</th><th>PAD profile</th></tr></thead><tbody id="admin-access-list"><tr><td colspan="2" class="text-center text-muted py-5">Loading approved accounts...</td></tr></tbody></table></div>
+                <div id="admin-offices-panel" class="card d-none">
+                  <div class="card-header">
+                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Routing offices and key officials</h5><small class="text-muted">Active offices appear in document routing. <a href="https://sksu.edu.ph/key-officials/" target="_blank" rel="noopener">SKSU source directory</a> · imported 1 October 2026.</small></div><button id="admin-add-office" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add office</button></div>
+                    <div class="row g-2"><div class="col-md-6"><label class="visually-hidden" for="admin-office-search">Search offices and officials</label><input id="admin-office-search" type="search" class="form-control" placeholder="Search office, official, position, or email" /></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-campus-filter">Filter campus</label><select id="admin-office-campus-filter" class="form-select"><option value="">All campuses</option></select></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-status">Filter routing status</label><select id="admin-office-status" class="form-select"><option value="">All offices</option><option value="1">Active for routing</option><option value="0">Inactive</option></select></div></div>
+                  </div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Routing office</th><th>Campus / domain</th><th>Key officials and contacts</th><th>Routing</th><th>Actions</th></tr></thead><tbody id="admin-offices-list"></tbody></table></div>
+                  <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-office-count" class="text-muted"></small><div class="btn-group"><button id="admin-office-prev" class="btn btn-sm btn-outline-secondary" type="button" data-office-page="-1">Previous</button><button id="admin-office-next" class="btn btn-sm btn-outline-secondary" type="button" data-office-page="1">Next</button></div></div>
                 </div>
               </section>
             </div>
@@ -221,6 +203,44 @@
     </div>
 
     <div class="modal fade" id="upload-modal" tabindex="-1" aria-labelledby="upload-modal-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form id="upload-form"><div class="modal-header"><div><p class="eyebrow mb-1">REGISTER DOCUMENT</p><h5 id="upload-modal-title" class="modal-title">Receive or upload a document</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="alert alert-warning small"><i class="bx bx-info-circle me-1"></i>Outside documents are received by the Records Office first. Use <strong>Office document</strong> for documents your office is sending.</div><div class="row g-3"><div class="col-md-6"><label class="form-label" for="origin-type">Document source</label><select id="origin-type" name="origin_type" class="form-select"><option value="external">Outside / external document</option><option value="office">Office document</option></select></div><div class="col-md-6" id="external-sender-field"><label class="form-label" for="external-sender">External sender</label><input id="external-sender" name="external_sender" class="form-control" maxlength="255" placeholder="Agency, organization, or person" /></div><div class="col-12"><label class="form-label" for="document-subject">Subject <span class="text-danger">*</span></label><input id="document-subject" name="subject" class="form-control" maxlength="255" required placeholder="Brief document subject" /></div><div class="col-12"><label class="form-label" for="document-description">Description / routing note</label><textarea id="document-description" name="description" class="form-control" rows="3" placeholder="Optional context for the receiving office"></textarea></div><div class="col-md-6"><label class="form-label" for="recipient-office">Intended final office</label><select id="recipient-office" name="recipient_office_id" class="form-select"><option value="">Select an office (optional)</option></select></div><div class="col-md-6"><label class="form-label" for="document-file">Document file <span class="text-danger">*</span></label><input id="document-file" name="file" class="form-control" type="file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" /><small class="text-muted">PDF, Word, Excel, JPG or PNG · max 10 MB</small></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="upload-submit" type="submit" class="btn btn-primary"><i class="bx bx-upload me-1"></i> Save document</button></div></form></div></div></div>
+
+    <div class="modal fade" id="admin-account-modal" tabindex="-1" aria-labelledby="admin-account-title" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content">
+      <form id="admin-account-form">
+        <div class="modal-header"><h5 class="modal-title" id="admin-account-title">Add account</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><p class="text-muted">The user signs in with Google. No PAD password is needed.</p><div id="admin-account-error" class="alert alert-danger d-none" role="alert"></div><input type="hidden" id="admin-account-id" />
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="admin-account-name">Full name</label><input id="admin-account-name" class="form-control" maxlength="160" required /></div>
+            <div class="col-md-6"><label class="form-label" for="admin-account-email">Approved Google email</label><input id="admin-account-email" type="email" class="form-control" maxlength="191" required /><small class="text-muted">The login email stays fixed after the account is created.</small></div>
+            <div class="col-md-6"><label class="form-label" for="admin-account-position">Position</label><input id="admin-account-position" class="form-control" maxlength="255" /></div>
+            <div class="col-md-6"><label class="form-label" for="admin-account-campus">Campus</label><input id="admin-account-campus" class="form-control" maxlength="80" list="admin-campus-options" /></div>
+            <div class="col-md-6"><label class="form-label" for="admin-account-role">PAD role</label><select id="admin-account-role" class="form-select"><option value="staff">Staff</option><option value="records">Records</option><option value="pad">Presidential Action Desk</option><option value="admin">Administrator</option></select></div>
+            <div class="col-md-6"><label class="form-label" for="admin-account-active">PAD access</label><select id="admin-account-active" class="form-select"><option value="1">Active</option><option value="0">Disabled</option></select></div>
+            <div class="col-12"><label class="form-label" for="admin-account-office">Assigned routing office</label><select id="admin-account-office" class="form-select"></select><small class="text-muted">Assign an office before this account sends office documents.</small></div>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="admin-account-submit" type="submit" class="btn btn-primary">Save account</button></div>
+      </form>
+    </div></div></div>
+    <div class="modal fade" id="admin-office-modal" tabindex="-1" aria-labelledby="admin-office-title" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+      <form id="admin-office-form">
+        <div class="modal-header"><h5 class="modal-title" id="admin-office-title">Add routing office</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div id="admin-office-error" class="alert alert-danger d-none" role="alert"></div><input type="hidden" id="admin-office-id" />
+          <div class="row g-3">
+            <div class="col-md-4"><label class="form-label" for="admin-office-code">Permanent office code</label><input id="admin-office-code" class="form-control text-uppercase" maxlength="30" required placeholder="Example: ISULAN-CCS" /></div>
+            <div class="col-md-8"><label class="form-label" for="admin-office-name">Office name</label><input id="admin-office-name" class="form-control" maxlength="160" required /></div>
+            <div class="col-md-4"><label class="form-label" for="admin-office-campus">Campus</label><input id="admin-office-campus" class="form-control" maxlength="80" list="admin-campus-options" /></div>
+            <div class="col-md-8"><label class="form-label" for="admin-office-domain">Administrative domain</label><input id="admin-office-domain" class="form-control" maxlength="160" list="admin-domain-options" /></div>
+            <div class="col-md-8"><label class="form-label" for="admin-office-email">Office contact email</label><input id="admin-office-email" type="email" class="form-control" maxlength="191" /></div>
+            <div class="col-md-4"><label class="form-label" for="admin-office-active">Document routing</label><select id="admin-office-active" class="form-select"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+            <div class="col-12"><label class="form-label" for="admin-office-description">Notes</label><textarea id="admin-office-description" class="form-control" rows="2" maxlength="1000"></textarea></div>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-4 mb-3"><h6 class="mb-0">Key officials</h6><button id="admin-add-official" type="button" class="btn btn-sm btn-outline-primary"><i class="bx bx-plus me-1"></i> Add official</button></div>
+          <div id="admin-official-fields"></div><small class="text-muted">Officials are routing contacts. Their login access is managed separately in Account management.</small><p id="admin-office-source" class="small text-muted mt-3 mb-0"></p>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="admin-office-submit" type="submit" class="btn btn-primary">Save office</button></div>
+      </form>
+    </div></div></div>
+    <datalist id="admin-campus-options"></datalist><datalist id="admin-domain-options"></datalist>
 
     <script src="/assets/vendor/js/helpers.js"></script>
     <script src="/assets/js/config.js"></script>

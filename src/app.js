@@ -1,7 +1,12 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const state = { token: localStorage.getItem('pad_access_token'), user: null, offices: [], documents: [], admin: { overview: null, users: [], offices: [], accessList: [] } };
+const state = { token: localStorage.getItem('pad_access_token'), user: null, offices: [], documents: [], admin: { overview: null, accounts: [], offices: [] } };
 const byId = (id) => document.getElementById(id);
 const uploadModal = new bootstrap.Modal(byId('upload-modal'));
+const accountModal = new bootstrap.Modal(byId('admin-account-modal'));
+const officeModal = new bootstrap.Modal(byId('admin-office-modal'));
+const adminPages = { account: 1, office: 1 };
+let googleSignInPromise = null;
+let signingIn = false;
 
 function showNotice(message, type = 'danger') {
   const notice = byId('notice');
@@ -26,7 +31,7 @@ async function api(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status === 401 && state.token) signOut();
+    if (response.status === 401 && state.token) signOut(body.message);
     throw new Error(body.message || 'The request could not be completed.');
   }
   return body;
@@ -53,11 +58,13 @@ function setProfile() {
   byId('admin-nav-item').classList.toggle('d-none', user.role !== 'admin');
   const image = byId('user-avatar');
   byId('user-initials').textContent = initials(user.name);
-  if (user.avatar_url) { image.src = user.avatar_url; image.classList.remove('d-none'); byId('user-initials').classList.add('d-none'); }
+  image.classList.toggle('d-none', !user.avatar_url);
+  byId('user-initials').classList.toggle('d-none', Boolean(user.avatar_url));
+  if (user.avatar_url) image.src = user.avatar_url;
 }
 
 function renderOfficeOptions() {
-  byId('recipient-office').innerHTML = '<option value="">Select an office (optional)</option>' + state.offices.map((office) => `<option value="${office.id}">${escapeHtml(office.name)}</option>`).join('');
+  byId('recipient-office').innerHTML = '<option value="">Select an office (optional)</option>' + state.offices.map((office) => `<option value="${office.id}">${escapeHtml(officeLabel(office))}</option>`).join('');
 }
 
 function row(document, showSource = true) {
@@ -110,87 +117,212 @@ function isAdministrator() {
   return state.user && state.user.role === 'admin';
 }
 
-function adminRoleOptions(selected) {
-  return ['staff', 'records', 'pad', 'admin'].map((role) => '<option value="' + role + '"' + (role === selected ? ' selected' : '') + '>' + role.charAt(0).toUpperCase() + role.slice(1) + '</option>').join('');
+function officeLabel(office) {
+  return office.name + (office.campus ? ' — ' + office.campus : '');
 }
 
 function adminOfficeOptions(selected) {
-  const offices = state.admin.offices.filter((office) => Number(office.is_active) === 1);
-  return '<option value="">Unassigned</option>' + offices.map((office) => '<option value="' + office.id + '"' + (Number(office.id) === Number(selected) ? ' selected' : '') + '>' + escapeHtml(office.name) + '</option>').join('');
+  const offices = state.admin.offices.filter((office) => Number(office.is_active) === 1 || Number(office.id) === Number(selected));
+  return '<option value="">Unassigned</option>' + offices.map((office) => '<option value="' + office.id + '"' + (Number(office.id) === Number(selected) ? ' selected' : '') + '>' + escapeHtml(officeLabel(office)) + (Number(office.is_active) === 1 ? '' : ' (inactive)') + '</option>').join('');
 }
 
 function adminAccessBadge(active) {
   return active ? '<span class="badge bg-label-success">Active</span>' : '<span class="badge bg-label-secondary">Disabled</span>';
 }
 
+function adminPageRows(rows, kind) {
+  const pages = Math.max(1, Math.ceil(rows.length / 20));
+  adminPages[kind] = Math.min(pages, Math.max(1, adminPages[kind]));
+  const start = (adminPages[kind] - 1) * 20;
+  byId('admin-' + kind + '-count').textContent = rows.length ? (start + 1) + '–' + Math.min(start + 20, rows.length) + ' of ' + rows.length : 'No matching records';
+  byId('admin-' + kind + '-prev').disabled = adminPages[kind] === 1;
+  byId('admin-' + kind + '-next').disabled = adminPages[kind] >= pages;
+  return rows.slice(start, start + 20);
+}
+
+function renderAdminAccounts() {
+  if (!isAdministrator()) return;
+  const query = byId('admin-account-search').value.trim().toLowerCase();
+  const status = byId('admin-account-status').value;
+  const rows = state.admin.accounts.filter((account) => {
+    const haystack = [account.name, account.email, account.position, account.campus, account.role, account.office_name, account.office_campus].join(' ').toLowerCase();
+    return (!query || haystack.includes(query)) && (!status || (status === 'pending' ? !account.last_login_at : status === 'active' ? Number(account.is_active) === 1 : Number(account.is_active) === 0));
+  });
+  byId('admin-users-list').innerHTML = adminPageRows(rows, 'account').map((account) =>
+    '<tr><td><strong>' + escapeHtml(account.name) + '</strong><small class="d-block text-muted">' + escapeHtml(account.email) + '</small>' +
+    (account.position ? '<small class="d-block text-muted">' + escapeHtml(account.position) + '</small>' : '') + '</td>' +
+    '<td><span class="badge bg-label-primary">' + escapeHtml(account.role === 'admin' ? 'Administrator' : account.role) + '</span></td>' +
+    '<td>' + escapeHtml(account.office_name ? officeLabel({ name: account.office_name, campus: account.office_campus }) : 'Unassigned') + '</td>' +
+    '<td>' + adminAccessBadge(Number(account.is_active) === 1) + '</td>' +
+    '<td><small class="text-muted">' + (account.last_login_at ? formatDate(account.last_login_at) : 'Not signed in yet') + '</small></td>' +
+    '<td><button type="button" class="btn btn-sm btn-outline-primary" data-edit-account="' + account.id + '">Manage</button></td></tr>'
+  ).join('') || '<tr><td colspan="6" class="text-center text-muted py-5">No matching accounts.</td></tr>';
+}
+
+function renderAdminOffices() {
+  if (!isAdministrator()) return;
+  const query = byId('admin-office-search').value.trim().toLowerCase();
+  const campus = byId('admin-office-campus-filter').value;
+  const status = byId('admin-office-status').value;
+  const rows = state.admin.offices.filter((office) => {
+    const haystack = [office.code, office.name, office.domain, office.campus, office.contact_email, ...(office.officials || []).flatMap((official) => [official.name, official.position, official.email, official.alternate_email])].join(' ').toLowerCase();
+    return (!query || haystack.includes(query)) && (!campus || (office.campus || '__unspecified') === campus) && (status === '' || Number(office.is_active) === Number(status));
+  });
+  byId('admin-offices-list').innerHTML = adminPageRows(rows, 'office').map((office) => {
+    const active = Number(office.is_active) === 1;
+    const core = ['RECORDS', 'PAD', 'OP'].includes(office.code);
+    const officials = (office.officials || []).map((official) => '<div class="mb-2"><strong class="small">' + escapeHtml(official.name) + '</strong><small class="d-block text-muted">' + escapeHtml(official.position) + '</small><small class="d-block">' + escapeHtml([official.email, official.alternate_email].filter(Boolean).join(' · ')) + '</small></div>').join('');
+    return '<tr><td><strong>' + escapeHtml(office.name) + '</strong><small class="d-block reference-number">' + escapeHtml(office.code) + '</small><small class="d-block text-muted">' + escapeHtml(office.contact_email || '') + '</small>' +
+      (office.description ? '<small class="d-block text-muted mt-2">' + escapeHtml(office.description) + '</small>' : '') + '</td>' +
+      '<td><span class="badge bg-label-primary mb-1">' + escapeHtml(office.campus || 'Campus not specified') + '</span><small class="d-block text-muted">' + escapeHtml(office.domain || '') + '</small></td>' +
+      '<td>' + (officials || '<small class="text-muted">No officials recorded.</small>') + '</td>' +
+      '<td>' + (active ? '<span class="badge bg-label-success">Active</span>' : '<span class="badge bg-label-secondary">Inactive</span>') + '<small class="d-block text-muted mt-1">' + Number(office.user_count || 0) + ' assigned accounts</small></td>' +
+      '<td><div class="d-flex flex-wrap gap-1"><button type="button" class="btn btn-sm btn-outline-primary" data-edit-office="' + office.id + '">Edit</button><button type="button" class="btn btn-sm btn-outline-secondary" data-toggle-office="' + office.id + '" data-office-active="' + (active ? '1' : '0') + '"' + (core ? ' disabled title="Core routing offices stay active"' : '') + '>' + (active ? 'Deactivate' : 'Activate') + '</button></div></td></tr>';
+  }).join('') || '<tr><td colspan="5" class="text-center text-muted py-5">No matching routing offices.</td></tr>';
+}
+
 function renderAdmin() {
   if (!isAdministrator() || !state.admin.overview) return;
-
   byId('admin-users-total').textContent = state.admin.overview.users;
   byId('admin-users-active').textContent = state.admin.overview.active_users;
   byId('admin-offices-total').textContent = state.admin.overview.offices;
   byId('admin-documents-total').textContent = state.admin.overview.documents;
+  const campusFilter = byId('admin-office-campus-filter').value;
+  const campuses = [...new Set(state.admin.offices.map((office) => office.campus).filter(Boolean))].sort();
+  const domains = [...new Set(state.admin.offices.map((office) => office.domain).filter(Boolean))].sort();
+  const options = (values) => values.map((value) => '<option value="' + escapeHtml(value) + '">' + escapeHtml(value) + '</option>').join('');
+  byId('admin-campus-options').innerHTML = options(campuses);
+  byId('admin-domain-options').innerHTML = options(domains);
+  byId('admin-office-campus-filter').innerHTML = '<option value="">All campuses</option><option value="__unspecified">Campus not specified</option>' + options(campuses);
+  byId('admin-office-campus-filter').value = campusFilter;
+  renderAdminAccounts();
+  renderAdminOffices();
+}
 
-  byId('admin-users-list').innerHTML = state.admin.users.length ? state.admin.users.map((member) => {
-    return '<tr>' +
-      '<td><div class="d-flex flex-column"><span class="fw-semibold">' + escapeHtml(member.name) + '</span><small class="text-muted">' + escapeHtml(member.email) + '</small></div></td>' +
-      '<td><select id="admin-role-' + member.id + '" class="form-select form-select-sm admin-select">' + adminRoleOptions(member.role) + '</select></td>' +
-      '<td><select id="admin-office-' + member.id + '" class="form-select form-select-sm admin-select">' + adminOfficeOptions(member.office_id) + '</select></td>' +
-      '<td><select id="admin-status-' + member.id + '" class="form-select form-select-sm admin-select"><option value="1"' + (Number(member.is_active) === 1 ? ' selected' : '') + '>Active</option><option value="0"' + (Number(member.is_active) === 0 ? ' selected' : '') + '>Disabled</option></select></td>' +
-      '<td><small class="text-muted">' + formatDate(member.last_login_at) + '</small></td>' +
-      '<td><button class="btn btn-sm btn-primary" type="button" data-save-user="' + member.id + '">Save</button></td>' +
-    '</tr>';
-  }).join('') : '<tr><td colspan="6" class="text-center text-muted py-5">No PAD users have signed in yet.</td></tr>';
-
-  byId('admin-offices-list').innerHTML = state.admin.offices.length ? state.admin.offices.map((office) => {
-    const systemOffice = office.code === 'RECORDS' || office.code === 'PAD';
-    const toggleLabel = Number(office.is_active) === 1 ? 'Deactivate' : 'Activate';
-    return '<tr>' +
-      '<td><div class="d-flex flex-column"><span class="fw-semibold">' + escapeHtml(office.name) + '</span><small class="reference-number">' + escapeHtml(office.code) + '</small></div></td>' +
-      '<td>' + escapeHtml(office.user_count) + '</td>' +
-      '<td>' + adminAccessBadge(Number(office.is_active) === 1) + '</td>' +
-      '<td><button class="btn btn-sm btn-outline-primary" type="button" data-toggle-office="' + office.id + '" data-office-active="' + (Number(office.is_active) === 1 ? '1' : '0') + '"' + (systemOffice ? ' disabled title="Core routing offices stay active"' : '') + '>' + toggleLabel + '</button></td>' +
-    '</tr>';
-  }).join('') : '<tr><td colspan="4" class="text-center text-muted py-5">No offices found.</td></tr>';
-
-  byId('admin-access-list').innerHTML = state.admin.accessList.length ? state.admin.accessList.map((account) => {
-    const accountEmail = String(account.email || '');
-    const profile = state.admin.users.find((member) => String(member.email || '').toLowerCase() === accountEmail.toLowerCase());
-    const profileText = profile ? escapeHtml(profile.role) + (profile.office_name ? ' - ' + escapeHtml(profile.office_name) : '') : 'Not signed in yet';
-    return '<tr><td class="fw-semibold">' + escapeHtml(accountEmail) + '</td><td><small class="text-muted">' + profileText + '</small></td></tr>';
-  }).join('') : '<tr><td colspan="2" class="text-center text-muted py-5">No approved email records found.</td></tr>';
+function showAdminTab(tab) {
+  if (!isAdministrator()) return;
+  ['accounts', 'offices'].forEach((name) => byId('admin-' + name + '-panel').classList.toggle('d-none', name !== tab));
+  document.querySelectorAll('[data-admin-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.adminTab === tab);
+    button.setAttribute('aria-pressed', String(button.dataset.adminTab === tab));
+  });
 }
 
 async function loadAdmin() {
   if (!isAdministrator()) return;
   try {
-    const responses = await Promise.all([
-      api('/api/admin/overview'),
-      api('/api/admin/users'),
-      api('/api/admin/offices'),
-      api('/api/admin/access-list')
-    ]);
-    state.admin.overview = responses[0].data;
-    state.admin.users = responses[1].data;
-    state.admin.offices = responses[2].data;
-    state.admin.accessList = responses[3].data;
+    const [overview, accounts, offices] = await Promise.all([api('/api/admin/overview'), api('/api/admin/accounts'), api('/api/admin/offices')]);
+    if (!isAdministrator()) return;
+    state.admin.overview = overview.data;
+    state.admin.accounts = accounts.data;
+    state.admin.offices = offices.data;
     renderAdmin();
-  } catch (error) {
-    showNotice(error.message);
-  }
+  } catch (error) { showNotice(error.message); }
 }
 
-async function saveAdminUser(userId) {
-  const role = byId('admin-role-' + userId).value;
-  const officeId = byId('admin-office-' + userId).value;
-  const isActive = byId('admin-status-' + userId).value === '1';
+function openAdminAccount(id = null) {
+  if (!isAdministrator()) return;
+  const account = id === null ? null : state.admin.accounts.find((item) => Number(item.id) === Number(id));
+  if (id !== null && !account) return;
+  byId('admin-account-form').reset();
+  byId('admin-account-error').classList.add('d-none');
+  byId('admin-account-title').textContent = account ? 'Manage account' : 'Add approved account';
+  byId('admin-account-id').value = account?.id || '';
+  byId('admin-account-name').value = account?.name || '';
+  byId('admin-account-email').value = account?.email || '';
+  byId('admin-account-email').readOnly = Boolean(account);
+  byId('admin-account-position').value = account?.position || '';
+  byId('admin-account-campus').value = account?.campus || '';
+  byId('admin-account-role').value = account?.role || 'staff';
+  byId('admin-account-active').value = String(account?.is_active ?? 1);
+  byId('admin-account-office').innerHTML = adminOfficeOptions(account?.office_id);
+  const self = account && Number(account.user_id) === Number(state.user.id);
+  byId('admin-account-role').disabled = Boolean(self);
+  byId('admin-account-active').disabled = Boolean(self);
+  accountModal.show();
+}
+
+async function saveAdminAccount(event) {
+  event.preventDefault();
+  const button = byId('admin-account-submit');
+  button.disabled = true;
+  byId('admin-account-error').classList.add('d-none');
+  const id = byId('admin-account-id').value;
+  const payload = {
+    name: byId('admin-account-name').value, email: byId('admin-account-email').value,
+    position: byId('admin-account-position').value, campus: byId('admin-account-campus').value,
+    role: byId('admin-account-role').value, is_active: byId('admin-account-active').value === '1',
+    office_id: byId('admin-account-office').value || null
+  };
   try {
-    await api('/api/admin/users/' + userId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: role, office_id: officeId === '' ? null : Number(officeId), is_active: isActive }) });
+    await api('/api/admin/accounts' + (id ? '/' + id : ''), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    accountModal.hide();
+    if (payload.email.toLowerCase() === state.user?.email.toLowerCase()) { state.user = (await api('/api/me')).user; setProfile(); }
     await loadAdmin();
-    showNotice('User access updated.', 'success');
+    showNotice(id ? 'Account access updated.' : 'Google email approved and account created.', 'success');
   } catch (error) {
-    showNotice(error.message);
-  }
+    byId('admin-account-error').textContent = error.message;
+    byId('admin-account-error').classList.remove('d-none');
+  } finally { button.disabled = false; }
+}
+
+let officialFieldSequence = 0;
+function appendOfficialFields(official = {}) {
+  const row = document.createElement('div');
+  row.className = 'border rounded p-3 mb-3';
+  row.dataset.officialRow = '';
+  const prefix = 'official-' + (++officialFieldSequence);
+  const fields = [['name', 'Full name', 'text', 160], ['position', 'Position', 'text', 255], ['email', 'Published email', 'email', 191], ['alternate_email', 'Alternate email', 'email', 191]];
+  row.innerHTML = '<div class="row g-2">' + fields.map(([key, label, type, max]) => '<div class="col-md-6"><label class="form-label" for="' + prefix + '-' + key + '">' + label + '</label><input id="' + prefix + '-' + key + '" data-official-field="' + key + '" class="form-control" type="' + type + '" maxlength="' + max + '" value="' + escapeHtml(official[key] || '') + '"' + (key === 'name' || key === 'position' ? ' required' : '') + ' /></div>').join('') + '</div><button type="button" class="btn btn-sm btn-outline-danger mt-2" data-remove-official>Remove official</button>';
+  byId('admin-official-fields').appendChild(row);
+}
+
+function openAdminOffice(id = null) {
+  if (!isAdministrator()) return;
+  const office = id === null ? null : state.admin.offices.find((item) => Number(item.id) === Number(id));
+  if (id !== null && !office) return;
+  byId('admin-office-form').reset();
+  byId('admin-office-error').classList.add('d-none');
+  byId('admin-office-title').textContent = office ? 'Edit routing office' : 'Add routing office';
+  byId('admin-office-id').value = office?.id || '';
+  byId('admin-office-code').value = office?.code || '';
+  byId('admin-office-code').readOnly = Boolean(office);
+  byId('admin-office-name').value = office?.name || '';
+  byId('admin-office-campus').value = office?.campus || '';
+  byId('admin-office-domain').value = office?.domain || '';
+  byId('admin-office-email').value = office?.contact_email || '';
+  byId('admin-office-description').value = office?.description || '';
+  byId('admin-office-active').value = String(office?.is_active ?? 1);
+  byId('admin-office-active').disabled = ['RECORDS', 'PAD', 'OP'].includes(office?.code);
+  byId('admin-office-source').textContent = office?.source_url ? 'Source: ' + office.source_url + ' · retrieved ' + office.source_checked_at : '';
+  byId('admin-official-fields').innerHTML = '';
+  (office?.officials || []).forEach(appendOfficialFields);
+  officeModal.show();
+}
+
+async function saveAdminOffice(event) {
+  event.preventDefault();
+  const button = byId('admin-office-submit');
+  button.disabled = true;
+  byId('admin-office-error').classList.add('d-none');
+  const id = byId('admin-office-id').value;
+  const officials = [...byId('admin-official-fields').querySelectorAll('[data-official-row]')].map((row) => Object.fromEntries(['name', 'position', 'email', 'alternate_email'].map((key) => [key, row.querySelector('[data-official-field="' + key + '"]').value])));
+  const payload = {
+    code: byId('admin-office-code').value, name: byId('admin-office-name').value,
+    campus: byId('admin-office-campus').value, domain: byId('admin-office-domain').value,
+    contact_email: byId('admin-office-email').value, description: byId('admin-office-description').value,
+    is_active: byId('admin-office-active').value === '1', officials
+  };
+  try {
+    await api('/api/admin/offices' + (id ? '/' + id : ''), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    officeModal.hide();
+    await loadAdmin();
+    await refreshWorkspace();
+    showNotice(id ? 'Office and officials updated.' : 'Routing office created.', 'success');
+  } catch (error) {
+    byId('admin-office-error').textContent = error.message;
+    byId('admin-office-error').classList.remove('d-none');
+  } finally { button.disabled = false; }
 }
 
 async function toggleAdminOffice(officeId, isActive) {
@@ -198,35 +330,18 @@ async function toggleAdminOffice(officeId, isActive) {
     await api('/api/admin/offices/' + officeId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !isActive }) });
     await loadAdmin();
     await refreshWorkspace();
-    showNotice('Office status updated.', 'success');
-  } catch (error) {
-    showNotice(error.message);
-  }
+    showNotice('Office routing status updated.', 'success');
+  } catch (error) { showNotice(error.message); }
 }
 
-async function createAdminOffice(event) {
-  event.preventDefault();
-  const button = byId('admin-office-submit');
-  button.disabled = true;
-  button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Adding...';
-  try {
-    const form = new FormData(event.currentTarget);
-    await api('/api/admin/offices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: form.get('code'), name: form.get('name'), description: form.get('description') }) });
-    event.currentTarget.reset();
-    await loadAdmin();
-    await refreshWorkspace();
-    showNotice('Office created.', 'success');
-  } catch (error) {
-    showNotice(error.message);
-  } finally {
-    button.disabled = false;
-    button.innerHTML = '<i class="bx bx-plus me-1"></i> Add office';
-  }
-}
 
 function changeSection(section) {
+  if (!['dashboard', 'documents', 'track', 'admin'].includes(section) || (section === 'admin' && !isAdministrator())) {
+    section = 'dashboard';
+  }
   document.querySelectorAll('.app-section').forEach((element) => element.classList.toggle('d-none', element.id !== `section-${section}`));
   document.querySelectorAll('[data-nav]').forEach((element) => element.classList.toggle('active', element.dataset.nav === section));
+  if (state.user) window.history.replaceState(null, '', `#${section}`);
   if (window.Helpers && window.Helpers._toggleCollapsed) document.querySelector('.layout-overlay')?.click();
 }
 
@@ -242,7 +357,7 @@ async function openDocument(reference) {
     byId('document-detail').innerHTML = `<div class="card-body p-4 p-md-5">
       <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mb-4"><div><p class="reference-number mb-2">${escapeHtml(data.reference_no)}</p><h4 class="mb-2">${escapeHtml(data.subject)}</h4><p class="mb-0 text-muted">${escapeHtml(data.description || 'No additional description.')}</p></div><div>${statusBadge(data.status)}</div></div>
       <div class="row g-3 detail-actions p-3 mb-4"><div class="col-sm-4"><small class="text-muted d-block">Current location</small><strong>${escapeHtml(data.current_office_name || '—')}</strong></div><div class="col-sm-4"><small class="text-muted d-block">Origin</small><strong>${escapeHtml(data.source_office_name || data.external_sender || 'External')}</strong></div><div class="col-sm-4"><small class="text-muted d-block">Intended final office</small><strong>${escapeHtml(data.recipient_office_name || 'Not specified')}</strong></div><div class="col-12"><a class="btn btn-outline-primary btn-sm" href="${API_BASE_URL}/api/documents/${encodeURIComponent(data.reference_no)}/download" target="_blank" rel="noopener"><i class="bx bx-download me-1"></i> Download ${escapeHtml(data.file_name)}</a></div></div>
-      ${canRoute ? `<div class="border rounded p-3 mb-4"><h6 class="mb-3">Document action</h6>${data.status === 'in_transit' ? `<button id="receive-document" class="btn btn-primary" type="button" data-reference="${escapeHtml(data.reference_no)}"><i class="bx bx-check-double me-1"></i> Record receipt</button>` : `<div class="row g-2 align-items-end"><div class="col-md-7"><label class="form-label" for="route-office">Route to</label><select id="route-office" class="form-select"><option value="">Choose destination office</option>${routes.map((office) => `<option value="${office.id}">${escapeHtml(office.name)}</option>`).join('')}</select></div><div class="col-md-5"><button id="route-document" class="btn btn-primary w-100" type="button" data-reference="${escapeHtml(data.reference_no)}"><i class="bx bx-transfer me-1"></i> Route document</button></div></div>`}</div>` : ''}
+      ${canRoute ? `<div class="border rounded p-3 mb-4"><h6 class="mb-3">Document action</h6>${data.status === 'in_transit' ? `<button id="receive-document" class="btn btn-primary" type="button" data-reference="${escapeHtml(data.reference_no)}"><i class="bx bx-check-double me-1"></i> Record receipt</button>` : `<div class="row g-2 align-items-end"><div class="col-md-7"><label class="form-label" for="route-office">Route to</label><select id="route-office" class="form-select"><option value="">Choose destination office</option>${routes.map((office) => `<option value="${office.id}">${escapeHtml(officeLabel(office))}</option>`).join('')}</select></div><div class="col-md-5"><button id="route-document" class="btn btn-primary w-100" type="button" data-reference="${escapeHtml(data.reference_no)}"><i class="bx bx-transfer me-1"></i> Route document</button></div></div>`}</div>` : ''}
       <h6 class="mb-4">Routing history</h6><div>${data.history.length ? data.history.map((item) => `<div class="trail-item"><span class="trail-dot"><i class="bx ${item.action === 'received' ? 'bx-check' : 'bx-transfer'}"></i></span><div class="d-flex flex-wrap justify-content-between gap-1"><strong>${escapeHtml(item.action.replace('_', ' '))}</strong><small class="text-muted">${formatDate(item.received_at || item.dispatched_at || item.created_at)}</small></div><p class="mb-1">${escapeHtml(item.origin_office_name || 'External / system')} <i class="bx bx-right-arrow-alt align-middle"></i> ${escapeHtml(item.destination_office_name || '—')}</p><small class="text-muted">${escapeHtml(item.notes || `Recorded by ${item.acted_by_name || 'system'}`)}</small></div>`).join('') : '<p class="text-muted">No routing actions have been recorded.</p>'}</div>
     </div>`;
   } catch (error) { byId('document-detail').innerHTML = `<div class="card-body text-center text-danger py-5">${escapeHtml(error.message)}</div>`; }
@@ -290,24 +405,38 @@ async function uploadDocument(event) {
   finally { button.disabled = false; button.innerHTML = '<i class="bx bx-upload me-1"></i> Save document'; }
 }
 
-function signOut() {
+function signOut(message = 'Sign in with your authorized Google account.') {
   localStorage.removeItem('pad_access_token');
-  state.token = null; state.user = null; state.documents = [];
+  state.token = null; state.user = null; state.documents = []; state.offices = [];
+  state.admin = { overview: null, accounts: [], offices: [] };
+  uploadModal.hide();
+  accountModal.hide();
+  officeModal.hide();
+  changeSection('dashboard');
   byId('app-view').classList.add('d-none');
   byId('auth-view').classList.remove('d-none');
-  byId('auth-status').textContent = 'Sign in with your authorized Google account.';
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  window.google?.accounts?.id?.disableAutoSelect();
+  byId('auth-status').textContent = message;
+  // A restored session may never have loaded the Google script or button.
+  loadGoogleSignIn().then((ready) => { if (ready && !state.token) byId('auth-status').textContent = message; });
 }
 
-window.handleGoogleCredential = async ({ credential }) => {
+window.handleGoogleCredential = async ({ credential } = {}) => {
+  if (signingIn) return;
+  if (!credential) { byId('auth-status').textContent = 'Choose a Google account to sign in.'; return; }
+  signingIn = true;
   byId('auth-status').textContent = 'Verifying your account…';
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/google`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential }) });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.message || 'Google sign-in could not be completed.');
+    if (!body.access_token || !body.user) throw new Error('Google sign-in could not be completed. Please try again.');
     state.token = body.access_token;
     localStorage.setItem('pad_access_token', state.token);
     await startApp();
   } catch (error) { byId('auth-status').textContent = error.message; }
+  finally { signingIn = false; }
 };
 
 function showGooglePlaceholder(message) {
@@ -317,39 +446,41 @@ function showGooglePlaceholder(message) {
 }
 
 async function loadGoogleSignIn() {
+  if (googleSignInPromise) return googleSignInPromise;
   if (!API_BASE_URL) {
-    showGooglePlaceholder('This deployment is missing its API address. Add VITE_API_BASE_URL in Vercel.');
-    return;
+    showGooglePlaceholder('Sign-in is unavailable. Contact the system administrator.');
+    return false;
   }
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/google/config`);
-    const config = await response.json();
-    if (!response.ok || !config.enabled) throw new Error('Google sign-in has not been configured yet. Contact the system administrator.');
+  googleSignInPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/google/config`);
+      const config = await response.json();
+      if (!response.ok || !config.enabled) throw new Error('Google sign-in has not been configured yet. Contact the system administrator.');
 
-    const renderButton = () => {
+      if (!window.google?.accounts?.id) await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = resolve;
+        script.onerror = () => { script.remove(); reject(new Error('Google sign-in could not load. Check your network connection.')); };
+        document.head.appendChild(script);
+      });
+
       const target = byId('google-signin');
       target.innerHTML = '';
-      google.accounts.id.initialize({ client_id: config.client_id, callback: window.handleGoogleCredential, auto_select: false });
-      google.accounts.id.renderButton(target, { theme: 'outline', size: 'large', shape: 'rect', width: 330, text: 'signin_with' });
+      window.google.accounts.id.initialize({ client_id: config.client_id, callback: window.handleGoogleCredential, auto_select: false });
+      window.google.accounts.id.renderButton(target, { theme: 'outline', size: 'large', shape: 'rect', width: 330, text: 'signin_with' });
       byId('auth-status').textContent = 'Choose your authorized Google account to continue.';
-    };
-
-    if (window.google && window.google.accounts) {
-      renderButton();
-      return;
+      return true;
+    } catch (error) {
+      showGooglePlaceholder(error.message);
+      googleSignInPromise = null;
+      return false;
     }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = renderButton;
-    script.onerror = () => showGooglePlaceholder('Google sign-in could not load. Check your network connection.');
-    document.head.appendChild(script);
-  } catch (error) {
-    showGooglePlaceholder(error.message);
-  }
+  })();
+  return googleSignInPromise;
 }
 
 async function startApp() {
@@ -357,17 +488,19 @@ async function startApp() {
     const response = await api('/api/me');
     state.user = response.user;
     setProfile();
+    // Use the role verified by the API for both fresh logins and restored sessions.
+    changeSection(isAdministrator() ? 'admin' : 'dashboard');
     byId('auth-view').classList.add('d-none');
     byId('app-view').classList.remove('d-none');
     await refreshWorkspace();
     await loadAdmin();
-  } catch (error) { signOut(); }
+  } catch (error) { signOut(error.message); }
 }
 
 document.addEventListener('click', (event) => {
   const section = event.target.closest('[data-section]');
   if (section) { event.preventDefault(); changeSection(section.dataset.section); }
-  const downloadLink = event.target.closest('a[href*=/download]');
+  const downloadLink = event.target.closest('a[href*="/download"]');
   if (downloadLink) {
     event.preventDefault();
     const pieces = downloadLink.pathname.split('/');
@@ -379,7 +512,12 @@ document.addEventListener('click', (event) => {
   if (event.target.closest('[data-open-upload]') || event.target.closest('#new-document-button')) openUpload();
   const route = event.target.closest('#route-document'); if (route) routeDocument(route.dataset.reference);
   const receive = event.target.closest('#receive-document'); if (receive) receiveDocument(receive.dataset.reference);
-  const saveUser = event.target.closest('[data-save-user]'); if (saveUser) saveAdminUser(saveUser.dataset.saveUser);
+  const adminTab = event.target.closest('[data-admin-tab]'); if (adminTab) showAdminTab(adminTab.dataset.adminTab);
+  const editAccount = event.target.closest('[data-edit-account]'); if (editAccount) openAdminAccount(editAccount.dataset.editAccount);
+  const editOffice = event.target.closest('[data-edit-office]'); if (editOffice) openAdminOffice(editOffice.dataset.editOffice);
+  const accountPage = event.target.closest('[data-account-page]'); if (accountPage) { adminPages.account += Number(accountPage.dataset.accountPage); renderAdminAccounts(); }
+  const officePage = event.target.closest('[data-office-page]'); if (officePage) { adminPages.office += Number(officePage.dataset.officePage); renderAdminOffices(); }
+  const removeOfficial = event.target.closest('[data-remove-official]'); if (removeOfficial) removeOfficial.closest('[data-official-row]').remove();
   const toggleOffice = event.target.closest('[data-toggle-office]'); if (toggleOffice) toggleAdminOffice(toggleOffice.dataset.toggleOffice, toggleOffice.dataset.officeActive === '1');
   if (event.target.closest('#admin-refresh')) loadAdmin();
 });
@@ -387,8 +525,17 @@ byId('document-search').addEventListener('input', renderDocuments);
 byId('status-filter').addEventListener('change', renderDocuments);
 byId('origin-type').addEventListener('change', (event) => byId('external-sender-field').classList.toggle('d-none', event.target.value !== 'external'));
 byId('upload-form').addEventListener('submit', uploadDocument);
-byId('admin-office-form').addEventListener('submit', createAdminOffice);
-byId('logout-button').addEventListener('click', signOut);
+byId('admin-office-form').addEventListener('submit', saveAdminOffice);
+byId('admin-account-form').addEventListener('submit', saveAdminAccount);
+byId('admin-add-account').addEventListener('click', () => openAdminAccount());
+byId('admin-add-office').addEventListener('click', () => openAdminOffice());
+byId('admin-add-official').addEventListener('click', () => appendOfficialFields());
+byId('admin-account-search').addEventListener('input', () => { adminPages.account = 1; renderAdminAccounts(); });
+byId('admin-account-status').addEventListener('change', () => { adminPages.account = 1; renderAdminAccounts(); });
+byId('admin-office-search').addEventListener('input', () => { adminPages.office = 1; renderAdminOffices(); });
+byId('admin-office-campus-filter').addEventListener('change', () => { adminPages.office = 1; renderAdminOffices(); });
+byId('admin-office-status').addEventListener('change', () => { adminPages.office = 1; renderAdminOffices(); });
+byId('logout-button').addEventListener('click', () => signOut());
 byId('footer-year').textContent = `© ${new Date().getFullYear()} Sultan Kudarat State University`;
 
 if (state.token) startApp(); else loadGoogleSignIn();

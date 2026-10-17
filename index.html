@@ -1,20 +1,26 @@
 <!doctype html>
-<html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default" data-assets-path="/assets/">
+<html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default" data-assets-path="./assets/">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer-when-downgrade" />
     <meta name="description" content="PAD — Presidential Action Desk: Electronic Document Routing, Tracking, and Executive Action System." />
     <meta name="theme-color" content="#0a6b45" />
     <title>PAD | Electronic Document Routing, Tracking, and Executive Action System</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/favicon/pad-routing.ico?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon/pad-routing-32.png?v=3" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon/pad-routing-16.png?v=3" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Saira:wght@600;700&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/assets/vendor/fonts/boxicons.css" />
     <link rel="stylesheet" href="/assets/vendor/css/core.css" />
     <link rel="stylesheet" href="/assets/vendor/css/theme-default.css" />
     <link rel="stylesheet" href="/assets/css/demo.css" />
     <link rel="stylesheet" href="/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css" />
+    <link rel="stylesheet" href="/assets/vendor/libs/select2/select2.min.css" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/president/styles.css" />
   </head>
   <body>
     <main id="auth-view" class="auth-shell">
@@ -77,6 +83,23 @@
       </section>
     </main>
 
+    <main id="role-view" class="role-shell d-none">
+      <section class="card role-card" aria-labelledby="role-title">
+        <div class="card-body p-4 p-md-5">
+          <span class="auth-mark mb-4" aria-hidden="true"><i class="bx bx-transfer-alt"></i></span>
+          <p class="eyebrow">PAD ACCOUNT ACCESS</p><h2 id="role-title" class="mb-2">Choose your account role</h2>
+          <p class="text-muted mb-4">Select the role you want to use for this session.</p>
+          <div class="role-identity mb-4"><strong id="role-user-name" class="d-block"></strong><small id="role-user-email" class="text-muted"></small></div>
+          <div id="role-error" class="alert alert-danger d-none" role="alert"></div>
+          <div id="role-options" class="d-grid gap-3"></div>
+          <p class="small text-muted mt-4 mb-3">You can switch roles from your account menu without signing in again.</p>
+          <button id="role-logout-button" class="btn btn-outline-secondary btn-sm" type="button"><i class="bx bx-log-out me-1"></i> Sign out</button>
+        </div>
+      </section>
+    </main>
+
+    <main id="president-view" class="pres-workspace d-none" aria-label="University President monitoring"></main>
+
     <div id="app-view" class="layout-wrapper layout-content-navbar d-none">
       <div class="layout-container">
         <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
@@ -95,18 +118,38 @@
             <li class="menu-item active" data-nav="dashboard">
               <a href="#dashboard" class="menu-link" data-section="dashboard"><i class="menu-icon tf-icons bx bx-grid-alt"></i><div>Overview</div></a>
             </li>
-            <li class="menu-item" data-nav="documents">
-              <a href="#documents" class="menu-link" data-section="documents"><i class="menu-icon tf-icons bx bx-folder-open"></i><div>Documents</div></a>
+            <li class="menu-item" data-nav="statistics">
+              <a href="#doc_router/statistics" class="menu-link" data-section="statistics"><i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i><div>Document Statistics</div></a>
             </li>
-            <li class="menu-item" data-nav="track">
-              <a href="#track" class="menu-link" data-section="track"><i class="menu-icon tf-icons bx bx-map-alt"></i><div>Track a document</div></a>
+            <li class="menu-header small text-uppercase"><span class="menu-header-text">Document Preparation</span></li>
+            <li id="register-document-nav-item" class="menu-item">
+              <button class="menu-link border-0 bg-transparent w-100 text-start" id="new-document-button" type="button"><i class="menu-icon tf-icons bx bx-plus-circle"></i><div>Register document</div></button>
             </li>
-            <li id="admin-nav-item" class="menu-item d-none" data-nav="admin">
-              <a href="#admin" class="menu-link" data-section="admin"><i class="menu-icon tf-icons bx bx-shield-quarter"></i><div>Administration</div></a>
+            <li class="menu-item" data-routing-queue="my_documents"><a href="#routing/my_documents" class="menu-link"><i class="menu-icon tf-icons bx bx-file"></i><div>My Document</div><span class="routing-nav-count badge bg-label-primary ms-auto" data-queue-count="my_documents">0</span></a></li>
+            <li class="menu-header small text-uppercase"><span class="menu-header-text">Receipt &amp; Routing</span></li>
+            <li class="menu-item" data-routing-queue="incoming"><a href="#routing/incoming" class="menu-link"><i class="menu-icon tf-icons bx bx-download"></i><div>Awaiting Receipt</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="incoming">0</span></a></li>
+            <li class="menu-item" data-routing-queue="received"><a href="#routing/received" class="menu-link"><i class="menu-icon tf-icons bx bx-check-circle"></i><div>Received</div><span class="routing-nav-count badge bg-label-success ms-auto" data-queue-count="received">0</span></a></li>
+            <li class="menu-item" data-routing-queue="outgoing"><a href="#routing/outgoing" class="menu-link"><i class="menu-icon tf-icons bx bx-send"></i><div>Outgoing</div><span class="routing-nav-count badge bg-label-primary ms-auto" data-queue-count="outgoing">0</span></a></li>
+            <li class="menu-item" data-routing-queue="returned"><a href="#routing/returned" class="menu-link"><i class="menu-icon tf-icons bx bx-undo"></i><div>Returned</div><span class="routing-nav-count badge bg-label-danger ms-auto" data-queue-count="returned">0</span></a></li>
+            <li id="routing-review-nav-group" class="menu-header small text-uppercase d-none"><span class="menu-header-text">PAD Review</span></li>
+            <li class="menu-item d-none" data-routing-queue="for_approval"><a href="#routing/for_approval" class="menu-link"><i class="menu-icon tf-icons bx bx-edit-alt"></i><div>For Approval</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="for_approval">0</span></a></li>
+            <li class="menu-item d-none" data-routing-queue="pad_results"><a href="#routing/pad_results" class="menu-link"><i class="menu-icon tf-icons bx bx-check-shield"></i><div>Returned from PAD</div><span class="routing-nav-count badge bg-label-info ms-auto" data-queue-count="pad_results">0</span></a></li>
+            <li class="menu-header small text-uppercase"><span class="menu-header-text">Completed &amp; History</span></li>
+            <li class="menu-item" data-routing-queue="acted"><a href="#routing/acted" class="menu-link"><i class="menu-icon tf-icons bx bx-task"></i><div>Acted</div><span class="routing-nav-count badge bg-label-info ms-auto" data-queue-count="acted">0</span></a></li>
+            <li class="menu-item" data-routing-queue="delivered"><a href="#routing/delivered" class="menu-link"><i class="menu-icon tf-icons bx bx-check-shield"></i><div>Delivered / completed</div><span class="routing-nav-count badge bg-label-success ms-auto" data-queue-count="delivered">0</span></a></li>
+            <li class="menu-item" data-routing-queue="all"><a href="#routing/all" class="menu-link"><i class="menu-icon tf-icons bx bx-history"></i><div>All Timeline</div><span class="routing-nav-count badge bg-label-secondary ms-auto" data-queue-count="all">0</span></a></li>
+            <li id="admin-nav-group" class="menu-header small text-uppercase d-none"><span class="menu-header-text">Administration</span></li>
+            <li id="admin-nav-item" class="menu-item d-none" data-admin-nav="accounts" data-admin-only>
+              <a href="#admin" class="menu-link"><i class="menu-icon tf-icons bx bx-user"></i><div>User accounts</div></a>
             </li>
-            <li class="menu-header small text-uppercase"><span class="menu-header-text">Operations</span></li>
-            <li class="menu-item">
-              <button class="menu-link border-0 bg-transparent w-100 text-start" id="new-document-button" type="button"><i class="menu-icon tf-icons bx bx-upload"></i><div>Receive / upload</div></button>
+            <li class="menu-item d-none" data-admin-nav="offices" data-admin-only>
+              <a href="#admin/offices" class="menu-link"><i class="menu-icon tf-icons bx bx-buildings"></i><div>Routing offices</div></a>
+            </li>
+            <li class="menu-item d-none" data-admin-nav="officials" data-admin-only>
+              <a href="#admin/officials" class="menu-link"><i class="menu-icon tf-icons bx bx-id-card"></i><div>Office officials</div></a>
+            </li>
+            <li class="menu-item d-none" data-admin-nav="database" data-admin-only>
+              <a href="#admin/database" class="menu-link"><i class="menu-icon tf-icons bx bx-data"></i><div>Database management</div></a>
             </li>
           </ul>
           <div class="menu-footer px-3 pb-3"><span class="badge bg-label-success">Executive action system</span></div>
@@ -121,12 +164,14 @@
               <div class="nav-item d-flex align-items-center me-3"><span id="api-state" class="connection-state"><i class="bx bx-radio-circle-marked"></i> Connected</span></div>
               <div class="navbar-nav flex-row align-items-center ms-auto">
                 <div class="nav-item navbar-dropdown dropdown-user dropdown">
-                  <a class="nav-link dropdown-toggle hide-arrow" href="javascript:void(0);" data-bs-toggle="dropdown" aria-label="Account menu">
+                  <a class="nav-link dropdown-toggle hide-arrow header-account" href="javascript:void(0);" data-bs-toggle="dropdown" aria-label="Account menu">
                     <div class="avatar avatar-online"><img id="user-avatar" class="w-px-40 h-auto rounded-circle d-none" alt="" /><span id="user-initials" class="avatar-initial rounded-circle bg-label-success">PA</span></div>
+                    <div class="header-identity"><span id="user-name" class="fw-semibold d-block">User</span><small id="user-email" class="identity-email text-muted"></small><small id="user-role" class="header-role d-block"></small></div>
                   </a>
                   <ul class="dropdown-menu dropdown-menu-end">
-                    <li><div class="dropdown-item"><div class="d-flex"><div class="flex-grow-1"><span id="user-name" class="fw-semibold d-block">User</span><small id="user-office" class="text-muted">Loading profile…</small></div></div></div></li>
+                    <li><div class="dropdown-item"><span id="user-menu-name" class="fw-semibold d-block">User</span><small id="user-menu-email" class="identity-email text-muted"></small><small id="user-office" class="d-block text-muted mt-1">Loading profile…</small></div></li>
                     <li><div class="dropdown-divider"></div></li>
+                    <li><button id="switch-role-button" class="dropdown-item d-none" type="button"><i class="bx bx-transfer-alt me-2"></i><span>Switch account role</span></button></li>
                     <li><button id="logout-button" class="dropdown-item" type="button"><i class="bx bx-power-off me-2"></i><span>Sign out</span></button></li>
                   </ul>
                 </div>
@@ -140,31 +185,47 @@
 
               <section id="section-dashboard" class="app-section">
                 <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
-                  <div><p class="eyebrow mb-1">PAD EXECUTIVE DOCUMENT CONTROL</p><h4 class="fw-bold mb-1">Good day, <span id="greeting-name">colleague</span>.</h4><p class="mb-0 text-muted">Keep each document moving with a complete, visible trail.</p></div>
-                  <button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-upload me-1"></i> Receive / upload</button>
+                  <div><p class="eyebrow mb-1">OFFICE WORKSPACE</p><h4 class="fw-bold mb-1">Overview</h4><p class="mb-0 text-muted">Good day, <span id="greeting-name">colleague</span>. These received documents need your office’s attention.</p><small id="overview-office" class="d-block text-primary mt-2"></small></div>
+                  <button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-plus me-1"></i> Register document</button>
                 </div>
-                <div class="row g-4 mb-4">
-                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon success"><i class="bx bx-folder"></i></span><p class="mb-1 text-muted">All visible documents</p><h3 id="metric-total" class="mb-0">—</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-transfer"></i></span><p class="mb-1 text-muted">In transit</p><h3 id="metric-transit" class="mb-0">—</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon forest"><i class="bx bx-check-double"></i></span><p class="mb-1 text-muted">Received</p><h3 id="metric-received" class="mb-0">—</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card metric-card"><div class="card-body"><span class="metric-icon muted"><i class="bx bx-time-five"></i></span><p class="mb-1 text-muted">New / created</p><h3 id="metric-created" class="mb-0">—</h3></div></div></div>
+                <div class="card mb-4 d-none" data-admin-only><div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3"><div><h5 class="mb-1"><i class="bx bx-shield-quarter me-1"></i> Database management</h5><p class="small text-muted mb-0">Highest administrative operation · review table counts, clear selected contents, and download recovery backups.</p></div><button type="button" class="btn btn-outline-danger" data-admin-nav="database">Manage database</button></div></div>
+                <div id="routing-assignment-notice" class="alert alert-info d-none">Your account needs an office assignment before you can register, send, or receive office documents. Ask your administrator to assign your office.</div>
+                <div class="card"><div class="card-header"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h5 class="mb-1">Received documents needing attention</h5><small class="text-muted">Received documents awaiting action, including correction results still requiring work.</small></div><button type="button" class="btn btn-sm btn-outline-primary" data-open-queue="incoming" data-own-scope>Awaiting Receipt <i class="bx bx-right-arrow-alt ms-1"></i></button></div><label for="overview-search" class="visually-hidden">Search received documents</label><div class="input-group input-group-merge"><span class="input-group-text"><i class="bx bx-search"></i></span><input id="overview-search" class="form-control" type="search" placeholder="Search file code, particulars, document type, or source" /></div></div><div id="overview-documents" class="routing-received-list" aria-live="polite"><div class="text-center text-muted py-5">Loading received documents…</div></div><div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2"><small id="overview-document-count" class="text-muted"></small><div class="btn-group" role="group" aria-label="Received document pages"><button id="overview-prev" class="btn btn-sm btn-outline-secondary" type="button" data-attention-page="-1">Previous</button><button id="overview-next" class="btn btn-sm btn-outline-secondary" type="button" data-attention-page="1">Next</button></div></div></div>
+              </section>
+
+              <section id="section-statistics" class="app-section d-none">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+                  <div><p class="eyebrow mb-1">DOCUMENT STATISTICS</p><h4 id="statistics-title" class="fw-bold mb-1">Document Statistics</h4><p id="statistics-description" class="mb-0 text-muted">View document volume, pending work, and processing activity.</p></div>
+                  <button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-plus me-1"></i> Register document</button>
                 </div>
-                <div class="card"><div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2"><div><h5 class="mb-1">Recent document activity</h5><small class="text-muted">The latest documents available to your office.</small></div><button class="btn btn-sm btn-outline-primary" type="button" data-section="documents">View all</button></div><div class="table-responsive text-nowrap"><table class="table table-hover"><thead><tr><th>Reference</th><th>Document</th><th>Current location</th><th>Status</th><th>Updated</th></tr></thead><tbody id="recent-documents"><tr><td colspan="5" class="text-center text-muted py-4">Loading documents…</td></tr></tbody></table></div></div>
+                <div class="card mb-4"><div class="card-body"><div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><strong id="statistics-scope">Loading statistics…</strong><small id="statistics-updated" class="text-muted"></small></div><form id="statistics-form" class="row g-3 align-items-end"><div class="col-sm-6 col-lg-3"><label for="statistics-start" class="form-label">From</label><input id="statistics-start" class="form-control" type="date" required /></div><div class="col-sm-6 col-lg-3"><label for="statistics-end" class="form-label">To</label><input id="statistics-end" class="form-control" type="date" required /></div><div class="col-lg-3"><label for="statistics-type" class="form-label">Document type</label><select id="statistics-type" class="form-select"><option value="">All document types</option></select></div><div class="col-lg-3 d-flex gap-2"><button id="statistics-apply" class="btn btn-primary" type="submit">Apply</button><button id="statistics-reset" class="btn btn-outline-secondary" type="button">This year</button></div></form><small class="text-muted d-block mt-3">Dates filter period activity. Current workload includes older pending records. Document type filters both sections.</small><div id="statistics-error" class="alert alert-danger d-none mt-3 mb-0" role="alert"></div></div></div>
+                <div id="statistics-report" class="d-none" aria-live="polite">
+                  <div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><h5 class="mb-0">Registry &amp; current workload</h5><small class="text-muted">Current snapshot · all registration dates</small></div>
+                  <div id="statistics-snapshot" class="row g-3 mb-3"></div><p id="statistics-corrections" class="small text-muted mb-4"></p>
+                  <div class="card mb-4"><div class="card-header"><h5 class="mb-1">Activity in selected period</h5><small id="statistics-period-label" class="text-muted"></small></div><div class="card-body"><div id="statistics-period" class="statistics-period-grid"></div><small class="text-muted d-block mt-3">Counts are unique documents for each activity. A document can appear in multiple activities. Dispatch events count repeated sends separately.</small></div></div>
+                  <div class="row g-4 mb-4"><div class="col-xl-7"><div class="card h-100"><div class="card-header"><h5 class="mb-1">Monthly document trends</h5><small class="text-muted">Registration dates and Act dates · unique documents per month</small></div><div class="card-body"><div id="statistics-monthly-chart"></div><details class="mt-3"><summary>View monthly figures</summary><div id="statistics-monthly-table" class="mt-3"></div></details></div></div></div><div class="col-xl-5"><div class="card h-100"><div class="card-header"><h5 class="mb-1">Document types</h5><small class="text-muted">Documents registered during the selected period</small></div><div id="statistics-types" class="card-body"></div></div></div></div>
+                  <div class="row g-4 mb-4"><div class="col-lg-4"><div class="card h-100"><div class="card-header"><h5 class="mb-1">Pending age</h5><small class="text-muted">Calendar days since dispatch or current office receipt</small></div><div id="statistics-aging" class="card-body"></div></div></div><div class="col-lg-4"><div class="card h-100"><div class="card-header"><h5 class="mb-1">Average processing time</h5><small class="text-muted">Recorded timestamps · calendar days</small></div><div id="statistics-processing" class="card-body"></div></div></div><div class="col-lg-4"><div class="card h-100"><div class="card-header"><h5 class="mb-1">Current recorded statuses</h5><small class="text-muted">All scoped documents, including those sent onward</small></div><div id="statistics-statuses" class="card-body"></div></div></div></div>
+                  <div class="card mb-4"><div class="card-header"><h5 id="statistics-office-workload-title" class="mb-1">Office workload &amp; activity</h5><small class="text-muted">Pending columns show current workload. Activity columns use the selected period and performing office. Office document counts can overlap; do not add them for a system total.</small></div><div id="statistics-office-workload"></div></div>
+                  <div class="card mb-4"><div class="card-header"><h5 class="mb-1">My office’s oldest pending documents</h5><small class="text-muted">Up to ten documents awaiting receipt or action in your assigned office</small></div><div id="statistics-oldest"></div></div>
+                </div>
+                <div class="mb-3"><h5 class="mb-1">My office queues</h5><p class="small text-muted mb-0"><span id="statistics-workload-office">Your assigned office</span> · All dates and document types. Acted archives and review queues can overlap other queues.</p></div>
+                <div id="routing-stats" class="row g-3 mb-4"></div>
               </section>
 
               <section id="section-documents" class="app-section d-none">
-                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4"><div><p class="eyebrow mb-1">REGISTRY</p><h4 class="fw-bold mb-1">Documents</h4><p class="mb-0 text-muted">Search the documents currently available to your office.</p></div><button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-upload me-1"></i> Receive / upload</button></div>
-                <div class="card"><div class="card-header"><div class="row g-3"><div class="col-md-7"><label class="visually-hidden" for="document-search">Search documents</label><div class="input-group input-group-merge"><span class="input-group-text"><i class="bx bx-search"></i></span><input id="document-search" class="form-control" type="search" placeholder="Search reference, subject, or office" /></div></div><div class="col-md-5"><select id="status-filter" class="form-select"><option value="">All statuses</option><option value="created">Created</option><option value="in_transit">In transit</option><option value="received">Received</option><option value="completed">Completed</option></select></div></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Reference</th><th>Document</th><th>From</th><th>Current location</th><th>Status</th><th></th></tr></thead><tbody id="document-list"><tr><td colspan="6" class="text-center text-muted py-5">Loading documents…</td></tr></tbody></table></div></div>
+                <div class="routing-context mb-4"><div><span class="routing-context-icon"><i class="bx bx-buildings"></i></span><strong id="routing-office-name">Your office</strong><span id="routing-office-campus" class="badge bg-label-success ms-2"></span></div><div id="routing-monitor-wrap" class="d-none"><label for="routing-office-filter" class="small text-muted">Timeline monitoring scope</label><select id="routing-office-filter" class="form-select form-select-sm"><option value="all">All offices</option></select></div></div>
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4"><div><p class="eyebrow mb-1">OFFICE DOCUMENT ROUTING</p><h4 id="routing-queue-title" class="fw-bold mb-1">All Timeline</h4><p id="routing-queue-description" class="mb-0 text-muted">Every document your office registered, sent, or received.</p><small id="routing-queue-office" class="d-block text-primary mt-2"></small></div><button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-plus me-1"></i> Register document</button></div>
+                <div class="card"><div class="card-header"><div class="row g-3"><div class="col-md-8"><label class="visually-hidden" for="document-search">Search documents</label><div class="input-group input-group-merge"><span class="input-group-text"><i class="bx bx-search"></i></span><input id="document-search" class="form-control" type="search" placeholder="Search document number, particulars, type, or office" /></div></div><div class="col-md-4"><label class="visually-hidden" for="status-filter">Filter status</label><select id="status-filter" class="form-select"><option value="">All statuses</option><option value="created">My Document</option><option value="in_transit">Awaiting receipt</option><option value="received">Receipt confirmed</option><option value="acted">Acted</option><option value="completed">Completed</option><option value="delivered">Delivered</option></select></div></div></div><div id="document-table-wrap" class="table-responsive"><table class="table table-hover align-middle routing-table"><thead><tr id="document-table-head"><th>File code / date</th><th>Particular</th><th>Current location / destination</th><th>Status</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="document-list"><tr><td colspan="5" class="text-center text-muted py-5">Loading documents…</td></tr></tbody></table></div><div id="received-card-list" class="routing-received-list d-none" aria-live="polite"></div><div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2"><small id="routing-document-count" class="text-muted"></small><div class="btn-group" role="group" aria-label="Document pages"><button id="routing-prev" class="btn btn-sm btn-outline-secondary" type="button" data-routing-page="-1">Previous</button><button id="routing-next" class="btn btn-sm btn-outline-secondary" type="button" data-routing-page="1">Next</button></div></div></div>
               </section>
 
               <section id="section-track" class="app-section d-none">
-                <div class="mb-4"><p class="eyebrow mb-1">CHAIN OF CUSTODY</p><h4 class="fw-bold mb-1">Track a document</h4><p class="text-muted mb-0">Open a document from your registry to see every recorded handoff and receipt.</p></div>
-                <div id="document-detail" class="card empty-detail"><div class="card-body text-center py-5"><div class="empty-icon"><i class="bx bx-map-alt"></i></div><h5>Choose a document to track</h5><p class="text-muted mb-0">Select <strong>View trail</strong> from the Documents registry.</p></div></div>
+                <div class="d-flex flex-wrap justify-content-between gap-3 mb-4"><div><p class="eyebrow mb-1">CHAIN OF CUSTODY</p><h4 class="fw-bold mb-1">Document timeline</h4><p class="text-muted mb-0">One document number, with every office handoff and action recorded.</p></div><button type="button" class="btn btn-outline-secondary" data-back-to-queue><i class="bx bx-left-arrow-alt me-1"></i> Back to documents</button></div>
+                <div id="document-detail" class="card empty-detail"><div class="card-body text-center py-5"><div class="empty-icon"><i class="bx bx-history"></i></div><h5>Choose a document</h5><p class="text-muted mb-0">Open a document from Awaiting Receipt, Received, or All Timeline.</p></div></div>
               </section>
+
               <section id="section-admin" class="app-section d-none">
-                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
-                  <div><p class="eyebrow mb-1">SYSTEM CONTROL</p><h4 class="fw-bold mb-1">Administration</h4><p class="mb-0 text-muted">Manage Google account access and the offices available for document routing.</p></div>
-                  <button id="admin-refresh" type="button" class="btn btn-outline-primary"><i class="bx bx-refresh me-1"></i> Refresh data</button>
+                <div class="mb-4">
+                  <div><p class="eyebrow mb-1">SYSTEM CONTROL</p><h4 class="fw-bold mb-1">Administration</h4><p class="mb-0 text-muted">Manage account access, routing offices, officials, and administrative database operations.</p></div>
                 </div>
                 <div class="row g-4 mb-4">
                   <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon success"><i class="bx bx-user"></i></span><p class="mb-1 text-muted">Approved accounts</p><h3 id="admin-users-total" class="mb-0">-</h3></div></div></div>
@@ -172,25 +233,34 @@
                   <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-buildings"></i></span><p class="mb-1 text-muted">Routing offices</p><h3 id="admin-offices-total" class="mb-0">-</h3></div></div></div>
                   <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon muted"><i class="bx bx-folder"></i></span><p class="mb-1 text-muted">Tracked documents</p><h3 id="admin-documents-total" class="mb-0">-</h3></div></div></div>
                 </div>
-                <div class="nav nav-pills gap-2 mb-4" aria-label="Administration modules">
-                  <button type="button" class="nav-link active" data-admin-tab="accounts" aria-pressed="true"><i class="bx bx-user me-1"></i> Account management</button>
-                  <button type="button" class="nav-link" data-admin-tab="offices" aria-pressed="false"><i class="bx bx-buildings me-1"></i> Routing offices</button>
+                <div id="admin-database-panel" class="d-none">
+                  <div class="card mb-4"><div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h5 class="mb-1">Database management</h5><small class="text-danger">Highest administrative operation · Administrator only</small></div><button id="database-refresh" type="button" class="btn btn-outline-secondary btn-sm"><i class="bx bx-refresh me-1"></i> Refresh counts</button></div><div class="card-body"><p class="mb-3">Review the affected tables before clearing their contents. A recovery backup is saved before deletion and every completed operation is logged. Login/access tables, document-number counters, and the operation log are protected.</p><div id="database-setup-notice" class="alert alert-info d-none">Database maintenance setup is required before clearing contents.</div><div id="database-error" class="alert alert-danger d-none" role="alert"></div><div id="database-success" class="alert alert-success d-none" role="status"></div><div class="border rounded p-3 d-flex flex-wrap justify-content-between align-items-center gap-3"><div><strong class="d-block">All document records</strong><small class="text-muted"><span id="database-document-count">—</span> documents. Also clears their routing history, PAD reviews, personnel links, and travel details. Uploaded files are retained for recovery; file codes are not reused.</small></div><button id="database-clear-documents" type="button" class="btn btn-danger" disabled>Clear all document records</button></div></div></div>
+                  <div class="card mb-4"><div class="card-header"><h5 class="mb-1">Tables &amp; record counts</h5><small class="text-muted">Linked references must be resolved before clearing a parent table. Empty and protected tables have no clear action.</small></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Table</th><th class="text-end">Records</th><th>Availability / affected content</th><th class="text-end">Operation</th></tr></thead><tbody id="database-tables"><tr><td colspan="4" class="text-center text-muted py-4">Loading table counts…</td></tr></tbody></table></div></div>
+                  <div class="card"><div class="card-header"><h5 class="mb-1">Recent clear operations</h5><small class="text-muted">Administrator, reason, affected counts, and recovery backup · latest 20 operations</small></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Date</th><th>Administrator</th><th>Affected content</th><th>Reason</th><th>Backup</th></tr></thead><tbody id="database-events"><tr><td colspan="5" class="text-center text-muted py-4">No operations loaded.</td></tr></tbody></table></div></div>
                 </div>
                 <div id="admin-accounts-panel" class="card">
                   <div class="card-header">
-                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Account management</h5><small class="text-muted">Approve a Google email, assign its role and office, or disable PAD access.</small></div><button id="admin-add-account" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add account</button></div>
+                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Account management</h5><small class="text-muted">Approve a Google email, assign one or more roles and any required office, or disable PAD access.</small></div><button id="admin-add-account" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add account</button></div>
                     <div class="row g-2"><div class="col-md-8"><label class="visually-hidden" for="admin-account-search">Search accounts</label><input id="admin-account-search" type="search" class="form-control" placeholder="Search name, email, role, or office" /></div><div class="col-md-4"><label class="visually-hidden" for="admin-account-status">Filter account status</label><select id="admin-account-status" class="form-select"><option value="">All accounts</option><option value="active">Active</option><option value="disabled">Disabled</option><option value="pending">Not signed in yet</option></select></div></div>
                   </div>
-                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Account</th><th>Role</th><th>Office</th><th>Access</th><th>Last sign-in</th><th>Actions</th></tr></thead><tbody id="admin-users-list"></tbody></table></div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Account name / email</th><th>Roles</th><th>Role offices</th><th>Access</th><th>Last sign-in</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="admin-users-list"></tbody></table></div>
                   <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-account-count" class="text-muted"></small><div class="btn-group"><button id="admin-account-prev" class="btn btn-sm btn-outline-secondary" type="button" data-account-page="-1">Previous</button><button id="admin-account-next" class="btn btn-sm btn-outline-secondary" type="button" data-account-page="1">Next</button></div></div>
                 </div>
                 <div id="admin-offices-panel" class="card d-none">
                   <div class="card-header">
-                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Routing offices and key officials</h5><small class="text-muted">Active offices appear in document routing. <a href="https://sksu.edu.ph/key-officials/" target="_blank" rel="noopener">SKSU source directory</a> · imported 1 October 2026.</small></div><button id="admin-add-office" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add office</button></div>
+                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Routing office management</h5><small class="text-muted">Manage the offices that receive routed documents and their official contacts.</small></div><button id="admin-add-office" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add office</button></div>
                     <div class="row g-2"><div class="col-md-6"><label class="visually-hidden" for="admin-office-search">Search offices and officials</label><input id="admin-office-search" type="search" class="form-control" placeholder="Search office, official, position, or email" /></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-campus-filter">Filter campus</label><select id="admin-office-campus-filter" class="form-select"><option value="">All campuses</option></select></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-status">Filter routing status</label><select id="admin-office-status" class="form-select"><option value="">All offices</option><option value="1">Active for routing</option><option value="0">Inactive</option></select></div></div>
                   </div>
-                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Routing office</th><th>Campus / domain</th><th>Key officials and contacts</th><th>Routing</th><th>Actions</th></tr></thead><tbody id="admin-offices-list"></tbody></table></div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Routing office</th><th>Campus / domain</th><th>Key officials and contacts</th><th>Routing</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="admin-offices-list"></tbody></table></div>
                   <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-office-count" class="text-muted"></small><div class="btn-group"><button id="admin-office-prev" class="btn btn-sm btn-outline-secondary" type="button" data-office-page="-1">Previous</button><button id="admin-office-next" class="btn btn-sm btn-outline-secondary" type="button" data-office-page="1">Next</button></div></div>
+                </div>
+                <div id="admin-officials-panel" class="card d-none">
+                  <div class="card-header">
+                    <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Office official management</h5><small class="text-muted">Maintain the people and contact emails assigned to each routing office. Login access is managed in User accounts.</small></div><button id="admin-create-official" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add official</button></div>
+                    <div class="row g-2"><div class="col-md-8"><label class="visually-hidden" for="admin-official-search">Search office officials</label><input id="admin-official-search" type="search" class="form-control" placeholder="Search name, position, email, or office" /></div><div class="col-md-4"><label class="visually-hidden" for="admin-official-office-filter">Filter officials by office</label><select id="admin-official-office-filter" class="form-select"><option value="">All routing offices</option></select></div></div>
+                  </div>
+                  <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Official name / email</th><th>Position</th><th>Routing office</th><th>Office status</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="admin-officials-list"></tbody></table></div>
+                  <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-official-count" class="text-muted"></small><div class="btn-group"><button id="admin-official-prev" class="btn btn-sm btn-outline-secondary" type="button" data-official-page="-1">Previous</button><button id="admin-official-next" class="btn btn-sm btn-outline-secondary" type="button" data-official-page="1">Next</button></div></div>
                 </div>
               </section>
             </div>
@@ -202,20 +272,55 @@
       <div class="layout-overlay layout-menu-toggle"></div>
     </div>
 
-    <div class="modal fade" id="upload-modal" tabindex="-1" aria-labelledby="upload-modal-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form id="upload-form"><div class="modal-header"><div><p class="eyebrow mb-1">REGISTER DOCUMENT</p><h5 id="upload-modal-title" class="modal-title">Receive or upload a document</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="alert alert-warning small"><i class="bx bx-info-circle me-1"></i>Outside documents are received by the Records Office first. Use <strong>Office document</strong> for documents your office is sending.</div><div class="row g-3"><div class="col-md-6"><label class="form-label" for="origin-type">Document source</label><select id="origin-type" name="origin_type" class="form-select"><option value="external">Outside / external document</option><option value="office">Office document</option></select></div><div class="col-md-6" id="external-sender-field"><label class="form-label" for="external-sender">External sender</label><input id="external-sender" name="external_sender" class="form-control" maxlength="255" placeholder="Agency, organization, or person" /></div><div class="col-12"><label class="form-label" for="document-subject">Subject <span class="text-danger">*</span></label><input id="document-subject" name="subject" class="form-control" maxlength="255" required placeholder="Brief document subject" /></div><div class="col-12"><label class="form-label" for="document-description">Description / routing note</label><textarea id="document-description" name="description" class="form-control" rows="3" placeholder="Optional context for the receiving office"></textarea></div><div class="col-md-6"><label class="form-label" for="recipient-office">Intended final office</label><select id="recipient-office" name="recipient_office_id" class="form-select"><option value="">Select an office (optional)</option></select></div><div class="col-md-6"><label class="form-label" for="document-file">Document file <span class="text-danger">*</span></label><input id="document-file" name="file" class="form-control" type="file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" /><small class="text-muted">PDF, Word, Excel, JPG or PNG · max 10 MB</small></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="upload-submit" type="submit" class="btn btn-primary"><i class="bx bx-upload me-1"></i> Save document</button></div></form></div></div></div>
+    <div class="modal fade" id="upload-modal" tabindex="-1" aria-labelledby="upload-modal-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form id="upload-form"><div class="modal-header"><div><p class="eyebrow mb-1">OFFICE DOCUMENT ROUTING</p><h5 id="upload-modal-title" class="modal-title">Register document</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">
+      <div id="upload-error" class="alert alert-danger d-none" role="alert"></div>
+      <div class="routing-number-preview mb-4"><i class="bx bx-barcode fs-3"></i><div><small class="d-block text-muted">Official document number</small><strong>Assigned upon saving</strong><small class="d-block text-muted">The same number follows this document through every office.</small></div></div>
+      <p class="small text-muted"><i class="bx bx-time-five me-1"></i>Registration date and time are recorded automatically when saved, in Asia/Manila (UTC+08:00). View the timeline to see how long the document stays in each office.</p>
+      <div class="alert alert-info text-dark small" role="note"><strong>First-time physical intake.</strong> Use this form when your office physically receives a document that has no PAD number yet. Saving creates its record and number. If another office already registered and sent it, open <strong>Incoming</strong> and confirm the hard-copy handoff there; do not register it again.</div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="origin-type">Document source <span class="text-danger">*</span></label><select id="origin-type" name="document_source" class="form-select" required aria-describedby="document-source-help"><option value="">Select document source</option></select><input id="document-origin-value" name="origin_type" type="hidden" value="office" /><input id="document-source-division" name="source_division_id" type="hidden" value="" /><small id="document-source-help" class="form-text d-block">Choose My Office if the document came from your office; otherwise select its source.</small></div>
+        <div class="col-md-6"><label class="form-label" for="document-type">Type of document <span class="text-danger">*</span></label><select id="document-type" name="document_type_id" class="form-select" required aria-describedby="document-type-help"><option value="">Select a document type</option></select><small id="document-type-help" class="form-text d-block">Select the document category. Travel Order shows additional travel details below.</small></div>
+        <div class="col-12"><label class="form-label" for="document-description">Description / registration remarks</label><textarea id="document-description" name="description" class="form-control" maxlength="10000" rows="5" placeholder="Enter brief details..."></textarea></div>
+        <div class="col-12 d-none" id="document-personnel-field">
+          <label class="form-label" id="document-personnel-label" for="document-personnel">Faculty / personnel involved (optional)</label>
+          <select id="document-personnel" name="personnel_ids[]" class="form-select" multiple disabled aria-describedby="document-personnel-help personnel-selection-count"></select>
+          <small id="document-personnel-help" class="form-text d-block">Link the people involved in this document.</small><small id="personnel-selection-count" class="form-text d-block" aria-live="polite">No names selected.</small>
+        </div>
+        <div class="col-12 d-none" id="travel-order-section">
+          <fieldset id="travel-order-fields" disabled class="border rounded p-3">
+            <legend class="float-none w-auto px-2 fs-6 mb-0">Travel Order details</legend>
+            <div class="row g-3 mt-0">
+              <div class="col-12"><label class="form-label" for="travel-destination">Destination <span class="text-danger">*</span></label><textarea id="travel-destination" name="travel_destination" class="form-control" rows="2" maxlength="2000" required placeholder="Place of travel"></textarea></div>
+              <div class="col-12"><label class="form-label" for="travel-purpose">Purpose <span class="text-danger">*</span></label><textarea id="travel-purpose" name="travel_purpose" class="form-control" rows="2" maxlength="2000" required placeholder="Purpose of travel"></textarea></div>
+              <div class="col-md-4"><label class="form-label" for="travel-order-date">Order date <span class="text-danger">*</span></label><input id="travel-order-date" name="travel_order_date" type="date" class="form-control" required /></div>
+              <div class="col-md-4"><label class="form-label" for="travel-departure-date">Departure date <span class="text-danger">*</span></label><input id="travel-departure-date" name="travel_departure_date" type="date" class="form-control" required /></div>
+              <div class="col-md-4"><label class="form-label" for="travel-return-date">Return date <span class="text-danger">*</span></label><input id="travel-return-date" name="travel_return_date" type="date" class="form-control" required /></div>
+              <div class="col-md-6"><label class="form-label" for="travel-type">Travel type <span class="text-danger">*</span></label><select id="travel-type" name="travel_type" class="form-select" required><option value="">Select travel type</option><option>Official Time</option><option>Official Business</option></select><small class="form-text d-block">The travel arrangement, separate from the document category.</small></div>
+              <div class="col-md-6"><label class="form-label" for="travel-vehicle">Vehicle requirement <span class="text-danger">*</span></label><select id="travel-vehicle" name="travel_vehicle_requirement" class="form-select" required><option value="">Select an option</option><option>Yes</option><option>Not Necessary</option></select></div>
+              <div class="col-12"><label class="form-label" for="travel-remarks">Travel remarks (optional)</label><textarea id="travel-remarks" name="travel_remarks" class="form-control" rows="2" maxlength="10000" placeholder="Additional travel remarks"></textarea></div>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+    </div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="upload-submit" type="submit" class="btn btn-primary"><i class="bx bx-save me-1"></i> Register document</button></div></form></div></div></div>
 
-    <div class="modal fade" id="admin-account-modal" tabindex="-1" aria-labelledby="admin-account-title" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal fade" id="routing-action-modal" tabindex="-1" aria-labelledby="routing-action-title" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="routing-action-form"><div class="modal-header"><div><p id="routing-action-reference" class="reference-number mb-1"></p><h5 id="routing-action-title" class="modal-title">Document action</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div id="routing-action-error" class="alert alert-danger d-none" role="alert"></div><p id="routing-action-description" class="text-muted"></p><div id="routing-decision-wrap" class="mb-3 d-none"><label class="form-label" for="routing-decision">PAD decision *</label><select id="routing-decision" class="form-select"><option value="">Select decision</option><option value="approved">Approved</option><option value="disapproved">Disapproved</option><option value="returned_for_correction">Returned for correction</option></select></div><div id="routing-destination-wrap" class="mb-3"><label id="routing-destination-label" class="form-label" for="routing-destination">Receiving office *</label><select id="routing-destination" class="form-select" aria-describedby="routing-destination-help"><option value="">Choose an office</option></select><small id="routing-destination-help" class="form-text d-block"></small></div><div id="routing-act-receipt-wrap" class="mb-3 d-none"><div class="form-check"><input id="routing-act-received" class="form-check-input" type="checkbox" disabled /><label class="form-check-label" for="routing-act-received">I confirm that Records has received the hard copy returned by PAD.</label></div></div><div id="routing-receipt-remark-wrap" class="mb-3 d-none"><label class="form-label" for="routing-receipt-remark">Receipt remarks (optional)</label><select id="routing-receipt-remark" class="form-select" aria-describedby="routing-receipt-remark-help" disabled><option value="">Select a remark (optional)</option></select><small id="routing-receipt-remark-help" class="form-text d-block">Choose a standard remark, or select Other / custom remark to add your own.</small></div><div id="routing-notes-wrap"><label id="routing-notes-label" class="form-label" for="routing-notes">Remarks</label><textarea id="routing-notes" class="form-control" rows="4" maxlength="10000" placeholder="Add a routing note"></textarea></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="routing-action-submit" class="btn btn-primary" type="submit">Confirm</button></div></form></div></div></div>
+
+
+    <div class="modal fade" id="admin-account-modal" tabindex="-1" aria-labelledby="admin-account-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
       <form id="admin-account-form">
         <div class="modal-header"><h5 class="modal-title" id="admin-account-title">Add account</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
         <div class="modal-body"><p class="text-muted">The user signs in with Google. No PAD password is needed.</p><div id="admin-account-error" class="alert alert-danger d-none" role="alert"></div><input type="hidden" id="admin-account-id" />
           <div class="row g-3">
             <div class="col-md-6"><label class="form-label" for="admin-account-name">Full name</label><input id="admin-account-name" class="form-control" maxlength="160" required /></div>
-            <div class="col-md-6"><label class="form-label" for="admin-account-email">Approved Google email</label><input id="admin-account-email" type="email" class="form-control" maxlength="191" required /><small class="text-muted">The login email stays fixed after the account is created.</small></div>
+            <div class="col-md-6"><label class="form-label" for="admin-account-email">Approved Google email</label><input id="admin-account-email" type="email" class="form-control" maxlength="191" required /><small id="admin-account-email-help" class="text-muted">The user signs in with this approved Google email.</small></div>
             <div class="col-md-6"><label class="form-label" for="admin-account-position">Position</label><input id="admin-account-position" class="form-control" maxlength="255" /></div>
             <div class="col-md-6"><label class="form-label" for="admin-account-campus">Campus</label><input id="admin-account-campus" class="form-control" maxlength="80" list="admin-campus-options" /></div>
-            <div class="col-md-6"><label class="form-label" for="admin-account-role">PAD role</label><select id="admin-account-role" class="form-select"><option value="staff">Staff</option><option value="records">Records</option><option value="pad">Presidential Action Desk</option><option value="admin">Administrator</option></select></div>
+            <div class="col-md-6"><fieldset><legend class="form-label">Account roles</legend><div class="d-flex flex-column gap-2"><div class="form-check"><input id="admin-account-role-admin" class="form-check-input" type="checkbox" value="admin" /><label class="form-check-label" for="admin-account-role-admin">Administrator</label></div><div class="form-check"><input id="admin-account-role-ovp-pad" class="form-check-input" type="checkbox" value="ovp_pad" /><label class="form-check-label" for="admin-account-role-ovp-pad">OVP PAD</label></div><div class="form-check"><input id="admin-account-role-ovp-central-records" class="form-check-input" type="checkbox" value="ovp_central_records" /><label class="form-check-label" for="admin-account-role-ovp-central-records">OVP Central Records</label></div><div class="form-check"><input id="admin-account-role-sksu-officials" class="form-check-input" type="checkbox" value="sksu_officials" /><label class="form-check-label" for="admin-account-role-sksu-officials">SKSU Officials</label></div></div><small class="text-muted">Select every role this account needs. The user chooses which role to use at login.</small></fieldset></div>
             <div class="col-md-6"><label class="form-label" for="admin-account-active">PAD access</label><select id="admin-account-active" class="form-select"><option value="1">Active</option><option value="0">Disabled</option></select></div>
-            <div class="col-12"><label class="form-label" for="admin-account-office">Assigned routing office</label><select id="admin-account-office" class="form-select"></select><small class="text-muted">Assign an office before this account sends office documents.</small></div>
+            <div id="admin-account-ovp-pad-field" class="col-12 d-none"><label class="form-label" for="admin-account-ovp-pad-office">OVP PAD routing office</label><select id="admin-account-ovp-pad-office" class="form-select"></select><small class="text-muted">Documents sent to this office appear when the user selects OVP PAD at login.</small></div>
+            <div id="admin-account-ovp-central-records-field" class="col-12 d-none"><label class="form-label" for="admin-account-ovp-central-records-office">OVP Central Records routing office</label><select id="admin-account-ovp-central-records-office" class="form-select"></select><small class="text-muted">This office handles intake, receipt, and routing when the user selects OVP Central Records.</small></div>
+            <div id="admin-account-office-field" class="col-12 d-none"><label class="form-label" for="admin-account-office">SKSU Officials office</label><select id="admin-account-office" class="form-select"></select><small id="admin-account-office-help" class="text-muted">Choose an active office listed in Office Officials. Office of the University President (OP) opens monitoring only, regardless of position. Documents are received by the assigned OVP PAD office.</small></div>
           </div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="admin-account-submit" type="submit" class="btn btn-primary">Save account</button></div>
@@ -242,14 +347,52 @@
     </div></div></div>
     <datalist id="admin-campus-options"></datalist><datalist id="admin-domain-options"></datalist>
 
+    <div class="modal fade" id="admin-official-modal" tabindex="-1" aria-labelledby="admin-official-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+      <form id="admin-official-form">
+        <div class="modal-header"><h5 id="admin-official-title" class="modal-title">Add office official</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div id="admin-official-error" class="alert alert-danger d-none" role="alert"></div><input id="admin-official-id" type="hidden" />
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label" for="admin-official-office">Routing office</label><select id="admin-official-office" class="form-select" required></select></div>
+            <div class="col-md-6"><label class="form-label" for="admin-official-name">Full name</label><input id="admin-official-name" class="form-control" maxlength="160" required /></div>
+            <div class="col-md-6"><label class="form-label" for="admin-official-position">Position</label><input id="admin-official-position" class="form-control" maxlength="255" required /></div>
+            <div class="col-md-6"><label class="form-label" for="admin-official-email">Published email</label><input id="admin-official-email" class="form-control" type="email" maxlength="191" /></div>
+            <div class="col-md-6"><label class="form-label" for="admin-official-alternate-email">Alternate email</label><input id="admin-official-alternate-email" class="form-control" type="email" maxlength="191" /></div>
+          </div><p class="small text-muted mt-3 mb-0">This contact belongs to the selected office. Active offices are available as document routing destinations.</p>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="admin-official-submit" type="submit" class="btn btn-primary">Save official</button></div>
+      </form>
+    </div></div></div>
+    <div class="modal fade" id="admin-detail-modal" tabindex="-1" aria-labelledby="admin-detail-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h5 id="admin-detail-title" class="modal-title">Record details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div id="admin-detail-body" class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div></div></div>
+    <div class="modal fade" id="admin-delete-modal" tabindex="-1" aria-labelledby="admin-delete-title" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="admin-delete-form">
+      <div class="modal-header"><h5 id="admin-delete-title" class="modal-title">Delete record?</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div id="admin-delete-error" class="alert alert-danger d-none" role="alert"></div><div id="admin-delete-record" class="mb-3"></div><p id="admin-delete-description"></p><p class="text-danger small mb-0">Deletion is permanent and cannot be undone.</p></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="admin-delete-submit" type="submit" class="btn btn-danger">Delete permanently</button></div>
+    </form></div></div></div>
+
     <script src="/assets/vendor/js/helpers.js"></script>
     <script src="/assets/js/config.js"></script>
     <script src="/assets/vendor/libs/jquery/jquery.js"></script>
+    <script src="/assets/vendor/libs/select2/select2.full.min.js"></script>
     <script src="/assets/vendor/libs/popper/popper.js"></script>
     <script src="/assets/vendor/js/bootstrap.js"></script>
     <script src="/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.js"></script>
     <script src="/assets/vendor/js/menu.js"></script>
     <script src="/assets/js/main.js"></script>
     <script type="module" src="/src/app.js"></script>
+    <div class="modal fade" id="database-clear-modal" tabindex="-1" aria-labelledby="database-clear-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><form id="database-clear-form">
+        <div class="modal-header"><h5 id="database-clear-title" class="modal-title">Review table-clear operation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+          <div class="alert alert-danger">This removes the contents of the listed tables. It does not remove the tables themselves. A recovery backup is created first; restoration requires a separate database recovery operation.</div>
+          <div id="database-clear-error" class="alert alert-danger d-none" role="alert"></div>
+          <div class="table-responsive mb-3"><table class="table table-bordered"><thead><tr><th>Affected table</th><th>Rows to clear</th></tr></thead><tbody id="database-clear-impact"></tbody></table></div>
+          <p id="database-clear-total" class="small text-muted"></p>
+          <label class="form-label" for="database-reason">Reason for this administrative operation</label><textarea id="database-reason" class="form-control mb-3" rows="2" minlength="3" maxlength="1000" required></textarea>
+          <label class="form-label" for="database-confirmation">Type <strong id="database-confirmation-phrase" style="text-transform: none;"></strong> to confirm</label><input id="database-confirmation" class="form-control mb-3" type="text" autocomplete="off" spellcheck="false" required />
+          <div class="form-check"><input id="database-acknowledged" class="form-check-input" type="checkbox" required /><label for="database-acknowledged" class="form-check-label">I reviewed the affected tables and authorize clearing their contents.</label></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="database-clear-submit" type="submit" class="btn btn-danger" disabled>Clear reviewed content</button></div>
+      </form></div></div>
+    </div>
   </body>
 </html>

@@ -1,7 +1,21 @@
 node_modules/
+# Vercel builds the frontend from source on each deployment.
 dist/
 .env
 .env.*
 !.env.example
-.vercel/
+# Only this public API address is versioned; private overrides stay ignored.
+!.env.production
 
+# Browser captures may contain live account and document information.
+/tests/artifacts/
+
+# Local backups, logs, and private key material.
+.rnd
+*.log
+*.bak
+*.backup
+*.pem
+*.key
+*.p12
+*.pfx

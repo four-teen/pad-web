@@ -1,0 +1,11 @@
+Generated with the built-in imagegen tool.
+
+Selected final prompt (opaque favicon):
+Use case: logo-brand. Create one clean production favicon for an electronic document routing web app. A bold white document/page silhouette with a folded upper-right corner, containing a thick green arrow pointing right, centered on a solid emerald green (#087549) square. The emerald background fills the entire square edge to edge, including all four corners, and is completely opaque. Two-color flat graphic: emerald green and pure white only. The white page has softly rounded lower corners and fills about 70 percent of the width and 80 percent of the height. Large simple shapes, thick arrow, minimal detail, unmistakable at 16 and 32 pixels. No transparency, texture, gradient, shadow, gloss, mottling, light effects, border, text, initials, watermark, or mockup. Front view of the icon alone.
+
+Transparent variant cleanup prompt:
+undefined
+
+Initial generation prompt:
+
+Use case: logo-brand. Asset type: a production favicon for PAD, the Presidential Action Desk electronic document routing, tracking, review, and executive action web app. Generate a single square icon: an emerald green rounded square (#087549) containing a bold white document/page silhouette with a small folded upper-right corner and one clean right-pointing routing arrow integrated into the document. Flat, crisp graphic design with strong simple shapes and broad strokes. The page and arrow should be instantly recognizable at 16 and 32 pixels. Center the mark, fill most of the square, leave a small even inset, use minimal detail and high contrast. Green tile itself opaque; only the small exterior corner areas outside the rounded square transparent. No text, letters, initials, decorative frame, shadows, gradient, texture, mockup, or watermark. Produce one icon only, viewed straight-on.

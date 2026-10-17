@@ -1,0 +1,16 @@
+Options -Indexes
+RewriteEngine On
+
+# Only the compiled frontend is public when this repository is under www.
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^dist(?:/|$) - [L]
+RewriteRule ^(?:index\.html)?$ dist/index.html [L]
+RewriteRule ^(assets|js|fonts)/(.*)$ dist/$1/$2 [L]
+RewriteRule ^ - [F,L]
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+    Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+</IfModule>

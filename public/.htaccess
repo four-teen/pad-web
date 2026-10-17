@@ -1,0 +1,11 @@
+Options -Indexes
+DirectoryIndex index.html
+RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+    Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+</IfModule>

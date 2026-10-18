@@ -96,16 +96,35 @@ async function showRolePicker(refresh = false) {
   byId('app-view').classList.add('d-none');
   byId('role-view').classList.remove('d-none');
   byId('role-error').classList.add('d-none');
-  byId('role-options').innerHTML = '<p class="text-muted">Loading your account roles…</p>';
+  byId('role-count').textContent = '';
+  byId('role-options').setAttribute('aria-busy', 'true');
+  byId('role-options').innerHTML = '<p class="role-empty" role="status">Loading your account roles…</p>';
   if (refresh) {
-    const response = await api('/api/me');
-    if (current !== roleRequest || !state.token) return;
-    state.user = response.user;
+    try {
+      const response = await api('/api/me');
+      if (current !== roleRequest || !state.token) return;
+      state.user = response.user;
+    } catch (error) {
+      if (current === roleRequest) {
+        byId('role-options').setAttribute('aria-busy', 'false');
+        byId('role-options').innerHTML = '<p class="role-empty" role="status">Your roles could not be loaded. Refresh the page to try again.</p>';
+      }
+      throw error;
+    }
   }
   if (current !== roleRequest || !state.token || !state.user) return;
   const roles = accountRoles();
   byId('role-user-name').textContent = state.user.name;
   byId('role-user-email').textContent = state.user.email.toLowerCase();
+  byId('role-user-initials').textContent = initials(state.user.name);
+  byId('role-count').textContent = `${roles.length} ${roles.length === 1 ? 'role' : 'roles'} assigned`;
+  const presentation = {
+    admin: { icon: 'bx-shield-quarter', label: 'System administration', scope: 'University-wide system access' },
+    ovp_pad: { icon: 'bx-pen', label: 'Document action' },
+    ovp_central_records: { icon: 'bx-archive', label: 'Records & routing' },
+    sksu_officials: { icon: 'bx-buildings', label: 'Office workspace' },
+    university_president: { icon: 'bxs-institution', label: 'Executive monitoring', scope: 'Read-only presidential view' }
+  };
   const descriptions = {
     admin: 'Manage approved accounts, offices, and system administration.',
     university_president: 'Monitor university-wide document flow and office workload. Read-only presidential view.',
@@ -115,9 +134,16 @@ async function showRolePicker(refresh = false) {
   };
   byId('role-options').innerHTML = roles.map((role) => {
     const office = state.user.role_offices?.[role];
-    const assignment = role === 'admin' ? '' : `<small class="d-block text-primary mt-1">${escapeHtml(office ? routingOfficeLabel(office) : 'Routing office unassigned')}</small>`;
-    return `<button class="role-option" type="button" data-choose-role="${role}"><span class="metric-icon ${role === 'admin' ? 'forest' : 'success'} mb-0"><i class="bx ${role === 'admin' ? 'bx-shield-quarter' : role === 'university_president' ? 'bxs-institution' : 'bx-transfer-alt'}"></i></span><span class="flex-grow-1"><strong class="d-block">${escapeHtml(accountRoleTitle(role))}</strong><small class="text-muted">${escapeHtml(descriptions[role] || 'Open your assigned module.')}</small>${assignment}</span><i class="bx bx-chevron-right"></i></button>`;
-  }).join('') || '<p class="text-muted">No account role is assigned. Contact your administrator.</p>';
+    const details = presentation[role];
+    const assignment = details.scope || (office ? routingOfficeLabel(office) : 'Routing office unassigned');
+    return `<button class="role-option role-option--${role}" type="button" data-choose-role="${role}" aria-labelledby="role-name-${role}" aria-describedby="role-description-${role} role-office-${role}">
+      <span class="role-option-heading"><span class="role-option-icon" aria-hidden="true"><i class="bx ${details.icon}"></i></span><span><small class="role-option-label">${details.label}</small><strong id="role-name-${role}" class="role-option-name">${escapeHtml(accountRoleTitle(role))}</strong></span></span>
+      <span id="role-description-${role}" class="role-option-description">${escapeHtml(descriptions[role] || 'Open your assigned module.')}</span>
+      <span id="role-office-${role}" class="role-option-office"><i class="bx ${details.scope ? 'bx-check-shield' : 'bx-map'}" aria-hidden="true"></i><span>${escapeHtml(assignment)}</span></span>
+      <span class="role-option-action"><span>Open workspace</span><i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
+    </button>`;
+  }).join('') || '<p class="role-empty" role="status">No account role is assigned. Contact your administrator.</p>';
+  byId('role-options').setAttribute('aria-busy', 'false');
   window.history.replaceState(null, '', '#choose-role');
 }
 

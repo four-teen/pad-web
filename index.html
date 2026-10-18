@@ -52,7 +52,7 @@
             </div>
           </div>
         </div>
-        <p class="auth-story-footer"><i class="bx bx-shield-quarter"></i> Secure, accountable, and traceable.</p>
+        <p class="auth-story-footer"><i class="bx bx-shield-quarter"></i> Secure, accountable, and traceable.<small class="auth-story-credit">antonioE, apellidoE, copyright 2026</small></p>
       </section>
 
       <section class="auth-access" aria-label="PAD sign in">
@@ -84,18 +84,33 @@
     </main>
 
     <main id="role-view" class="role-shell d-none">
-      <section class="card role-card" aria-labelledby="role-title">
-        <div class="card-body p-4 p-md-5">
-          <span class="auth-mark mb-4" aria-hidden="true"><i class="bx bx-transfer-alt"></i></span>
-          <p class="eyebrow">PAD ACCOUNT ACCESS</p><h2 id="role-title" class="mb-2">Choose your account role</h2>
-          <p class="text-muted mb-4">Select the role you want to use for this session.</p>
-          <div class="role-identity mb-4"><strong id="role-user-name" class="d-block"></strong><small id="role-user-email" class="text-muted"></small></div>
+      <div class="role-layout">
+        <header class="role-header">
+          <div class="role-brand">
+            <span class="auth-mark" aria-hidden="true"><i class="bx bx-transfer-alt"></i></span>
+            <span class="brand-copy"><strong>PAD</strong><small>Presidential Action Desk</small></span>
+          </div>
+          <button id="role-logout-button" class="role-signout" type="button"><i class="bx bx-log-out" aria-hidden="true"></i> Sign out</button>
+        </header>
+        <section class="role-workspace" aria-labelledby="role-title">
+          <div class="role-intro">
+            <div class="role-heading">
+              <p class="eyebrow">ONE ACCOUNT. YOUR WORKSPACES.</p>
+              <h1 id="role-title">Choose your account role</h1>
+              <p id="role-description">Pick a role to open your workspace and get started.</p>
+            </div>
+            <div class="role-identity">
+              <span id="role-user-initials" class="role-avatar" aria-hidden="true"></span>
+              <div class="role-identity-copy"><small>Signed in as</small><strong id="role-user-name"></strong><span id="role-user-email"></span></div>
+            </div>
+          </div>
           <div id="role-error" class="alert alert-danger d-none" role="alert"></div>
-          <div id="role-options" class="d-grid gap-3"></div>
-          <p class="small text-muted mt-4 mb-3">You can switch roles from your account menu without signing in again.</p>
-          <button id="role-logout-button" class="btn btn-outline-secondary btn-sm" type="button"><i class="bx bx-log-out me-1"></i> Sign out</button>
-        </div>
-      </section>
+          <div class="role-grid-heading"><h2>Available roles</h2><span id="role-count" role="status" aria-live="polite"></span></div>
+          <div id="role-options" class="role-options" role="group" aria-labelledby="role-title" aria-describedby="role-description" aria-busy="false"></div>
+          <p class="role-switch-note"><i class="bx bx-info-circle" aria-hidden="true"></i><span>You can switch roles anytime from your account menu. No need to sign in again.</span></p>
+        </section>
+        <footer class="role-footer"><span>Sultan Kudarat State University</span><span>Electronic Document Routing, Tracking, and Executive Action System</span></footer>
+      </div>
     </main>
 
     <main id="president-view" class="pres-workspace d-none" aria-label="University President monitoring"></main>

@@ -62,14 +62,29 @@ export function createPresidentView({ state, api, byId, escapeHtml: esc, formatD
 
   function renderReport(data) {
     const { period: p } = data;
-    const metric = (icon, value, label, note, accent = '') => `<article class="pres-metric ${accent}"><span class="pres-metric-icon"><i class="bx ${icon}" aria-hidden="true"></i></span><small>${esc(label)}</small><strong>${number(value)}</strong><p>${esc(note)}</p></article>`;
+    const recordedTypes = data.recorded_type_breakdown;
+    const recordedTotal = data.snapshot.total_documents;
+    const typeStyles = {
+      'ACTIVITY DESIGN': ['bx-calendar-event', 'violet'], 'EMAIL': ['bx-envelope', 'blue'],
+      'HAND CARRY': ['bx-folder-open', 'green'], 'LOCAL COMMUNICATION': ['bx-message-square-detail', 'amber'],
+      'MEMORANDUM': ['bx-notepad', 'olive'], 'MOA/MOU': ['bx-file-blank', 'violet'],
+      'OUTGOING COMMUNICATION': ['bx-send', 'orange'], 'PROJECT PROPOSAL': ['bx-bulb', 'rose'],
+      'TRAVEL ORDER': ['bx-trip', 'teal'],
+    };
+    const typeCard = (type) => {
+      const [icon, tone] = typeStyles[String(type.name).trim().replace(/\s+/g, ' ').toUpperCase()] || ['bx-file', 'green'];
+      const share = recordedTotal ? Math.min(100, Math.max(0, Number(type.documents) * 100 / recordedTotal)) : 0;
+      const shareLabel = share > 0 && share < 0.1 ? '<0.1' : number(Math.round(share * 10) / 10);
+      return `<article class="pres-metric pres-metric--type pres-type--${tone}"><span class="pres-metric-icon"><i class="bx ${icon}" aria-hidden="true"></i></span><small>${esc(type.name)}</small><strong>${number(type.documents)}</strong><div class="pres-type-share"><span>${esc(shareLabel)}% of total</span><div class="pres-type-share-track" aria-hidden="true"><span style="width:${share}%"></span></div></div></article>`;
+    };
     const actedTypes = data.acted_type_breakdown;
     const actedSummary = actedTypes.filter((type) => Number(type.documents) > 0);
     const processing = data.processing_time.registration_to_act;
     const average = processing.seconds === null ? '—' : `${number(Math.round(processing.seconds / 8640) / 10)} days`;
     const rows = data.office_workload.slice(0, 4);
     byId('president-overview-content').innerHTML = `
-      <div class="pres-metrics" role="region" aria-label="Acted documents by document type">${actedTypes.length ? actedTypes.map((type, index) => metric('bx-check-circle', type.documents, type.name, 'Acted documents · selected period', index === 0 ? 'pres-metric--orange' : '')).join('') : empty('No document types available.')}</div>
+      <div class="pres-type-heading"><div><h2>Documents by type</h2><p>All offices · All registration dates${data.filters.document_type ? ` · ${esc(data.filters.document_type)}` : ''}</p></div><span class="pres-recorded-total"><strong>${number(recordedTotal)}</strong> total documents</span></div>
+      <div class="pres-metrics pres-metrics--types" role="region" aria-label="All recorded documents by document type">${recordedTypes.length ? recordedTypes.map(typeCard).join('') : empty('No document types available.')}</div>
       <div class="pres-overview-grid"><section class="pres-card"><div class="pres-card-heading"><div><span class="pres-eyebrow">MOMENTUM</span><h2>Document flow</h2></div><span class="pres-muted">${esc(data.filters.start_date)} — ${esc(data.filters.end_date)}</span></div><div class="pres-flow">${[['registered', 'Registered'], ['received', 'Received'], ['acted', 'Acted'], ['delivered', 'Delivered']].map(([key, label]) => `<div><span>${esc(label)}</span><strong>${number(p[key])}</strong></div>`).join('')}</div><p class="pres-card-note">Unique documents per activity. A document can appear in more than one activity.</p></section>
       <section class="pres-card"><div class="pres-card-heading"><div><span class="pres-eyebrow">ACTED DOCUMENTS</span><h2>Acted by document type</h2></div></div><div class="pres-type-list">${actedSummary.length ? actedSummary.map((t) => `<div class="pres-type-row"><div><strong>${esc(t.name)}</strong><span>${number(t.documents)}</span></div></div>`).join('') : empty('No documents acted in this period.')}</div><p class="pres-card-note">Unique documents with a recorded Act in the selected period. Later delivery keeps the Act count.</p><div class="pres-processing"><i class="bx bx-timer" aria-hidden="true"></i><div><small>Average registration to first Act</small><strong>${average}</strong><span>${processing.samples ? `${number(processing.samples)} recorded samples · registration cohort` : 'No completed samples in this registration period'}</span></div></div></section></div>
       <div class="pres-overview-grid"><section class="pres-card"><div class="pres-card-heading"><div><span class="pres-eyebrow">OFFICE PULSE</span><h2>Workload across offices</h2></div><button class="pres-text-button" type="button" data-president-tab="offices">View all <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button></div><div class="pres-pulse-list">${rows.length ? rows.map((o) => `<button class="pres-pulse-row" type="button" data-president-office="${Number(o.id)}"><span class="pres-office-icon"><i class="bx bx-buildings" aria-hidden="true"></i></span><span><strong>${esc(o.name)}</strong><small>${esc(o.campus || 'Campus not recorded')}</small></span><span class="pres-pulse-value">${number(o.pending_action + o.awaiting_receipt)}<small>pending</small></span><i class="bx bx-chevron-right" aria-hidden="true"></i></button>`).join('') : empty('No office workload or activity to show.')}</div></section>

@@ -9,9 +9,11 @@ const routingSource = readFileSync(new URL('../src/doc_router/index.js', import.
 const statisticsSource = readFileSync(new URL('../src/doc_router/statistics.js', import.meta.url), 'utf8').replace('export function createStatistics', 'function createStatistics');
 const databaseSource = readFileSync(new URL('../src/database-management.js', import.meta.url), 'utf8').replace('export function createDatabaseManagement', 'function createDatabaseManagement');
 const presidentSource = readFileSync(new URL('../src/president/index.js', import.meta.url), 'utf8').replace('export function createPresidentView', 'function createPresidentView');
-const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + presidentSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
+const attachmentSource = readFileSync(new URL('../src/attachment-preview.js', import.meta.url), 'utf8').replace(/^export /gm, '');
+const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
   .replace("import { createDocRouter } from './doc_router/index.js';", '').replace("import { createStatistics } from './doc_router/statistics.js';", '')
   .replace("import { createDatabaseManagement } from './database-management.js';", '')
+  .replace("import { createAttachmentPreview } from './attachment-preview.js';", '')
   .replace("import { createPresidentView } from './president/index.js';", '');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
@@ -22,6 +24,29 @@ const approvalDocument = {
   last_received_by_name: 'Sample Receiver', last_receipt_action: 'received', last_received_at: '2026-10-07 01:00:00',
   permissions: { decide: true }, history: [],
 };
+
+test('document lists show an escaped preview button only for an attached file', async () => {
+  const app = page(); await flush();
+  const row = (data) => vm.runInContext(`officeRouting.row(${JSON.stringify(data)})`, app.context);
+  assert.doesNotMatch(row({ reference_no: 'NO-FILE', file_name: 'missing.jpg' }), /data-preview-attachment/);
+  const attached = row({ reference_no: '25-6776', file_name: 'a"<file>.pdf', stored_file_name: 'private.pdf' });
+  assert.match(attached, /data-preview-attachment="25-6776"/);
+  assert.match(attached, /a&quot;&lt;file&gt;\.pdf/);
+  assert.doesNotMatch(attached, /href=.*download/);
+});
+
+test('attachment fetch uses the selected module and its existing authorization headers', async () => {
+  const file = new Blob(['sample-pdf'], { type: 'application/pdf' });
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/documents/25-6776/download')) return { body: file };
+  } });
+  await flush();
+  assert.equal(await vm.runInContext("loadDocumentFile('25-6776')", app.context), file);
+  const request = app.calls.find((call) => call.path.endsWith('/documents/25-6776/download'));
+  assert.equal(request.path, '/api/doc_router/documents/25-6776/download');
+  assert.equal(request.options.headers.Authorization, 'Bearer sample');
+  assert.equal(request.options.headers['X-PAD-Role'], 'ovp_central_records');
+});
 
 test('View shows latest-first milestones with original step numbers, an uppercase heading, and Manila custody times', async () => {
   const record = { ...approvalDocument, reference_no: 'PAD-2026-000777', created_at: '2026-10-06 17:02:03',
@@ -53,17 +78,19 @@ test('View shows latest-first milestones with original step numbers, an uppercas
 
 function page({ token, authorize = true, restore = true, role = 'staff',
   origin = 'http://localhost', pathname = '/', apiBase = 'http://pad.test',
-  profile = {}, accounts = [], offices = [], respond, activeRole, hash = '', jquery, formData = FormData } = {}) {
+  profile = {}, accounts = [], offices = [], respond, activeRole, hash = '', jquery, formData = FormData, googleWidth = 330 } = {}) {
   const elements = new Map();
   function element(id) {
     if (!elements.has(id)) {
       const classes = new Set(['app-view', 'role-view'].includes(id) || (id.startsWith('section-') && id !== 'section-dashboard') ? ['d-none'] : []);
       elements.set(id, {
-        id, textContent: '', innerHTML: '', value: '', dataset: {},
+        id, textContent: '', innerHTML: '', value: '', dataset: {}, clientWidth: id === 'google-signin' ? googleWidth : 0,
+        getBoundingClientRect() { return { width: this.clientWidth }; },
         classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name),
           contains: (name) => classes.has(name), toggle: (name, on) => on ? classes.add(name) : classes.delete(name) },
         addEventListener(name, handler) { this[name] = handler; },
         setAttribute() {}, reset() {}, focus() {}, scrollIntoView() {}, querySelectorAll: () => [],
+        replaceChildren() { this.innerHTML = ''; },
       });
     }
     return elements.get(id);
@@ -72,6 +99,8 @@ function page({ token, authorize = true, restore = true, role = 'staff',
   if (activeRole) storage.set('pad_active_role', activeRole);
   const calls = [];
   let rendered = 0;
+  const googleButtonWidths = [];
+  let googleResizeCallback;
   let disabledAutoSelect = 0;
   let currentUrl = '/';
   const sections = ['dashboard', 'statistics', 'documents', 'track', 'admin'].map((name) => element(`section-${name}`));
@@ -88,10 +117,15 @@ function page({ token, authorize = true, restore = true, role = 'staff',
     bootstrap: { Modal: class { constructor(target) { this.target = target; } hide() { this.target.visible = false; } show() { this.target.visible = true; } } },
     document: { getElementById: element, addEventListener() {}, querySelectorAll: (selector) => selector === '.app-section' ? sections : selector === '[data-nav]' ? navigation : selector === '[data-open-upload], #new-document-button' ? registrationButtons : [],
       head: { appendChild(script) { script.onload(); } }, createElement: () => ({ remove() {} }) },
-    window: { crypto: webcrypto, jQuery: jquery, scrollTo() {}, location: { origin, pathname, search: '', hash },
+    window: { crypto: webcrypto, jQuery: jquery, scrollTo() {}, addEventListener() {}, location: { origin, pathname, search: '', hash },
+      ResizeObserver: class {
+        constructor(callback) { this.callback = callback; }
+        observe() { googleResizeCallback = this.callback; }
+        disconnect() { googleResizeCallback = undefined; }
+      },
       isSecureContext: origin.startsWith('https:') || new URL(origin).hostname === 'localhost',
       history: { replaceState(_state, _title, url) { currentUrl = url; } }, google: { accounts: { id: {
-      initialize() {}, renderButton() { rendered++; }, disableAutoSelect() { disabledAutoSelect++; }
+      initialize() {}, renderButton(_target, options) { rendered++; googleButtonWidths.push(options.width); }, disableAutoSelect() { disabledAutoSelect++; }
     } } } },
     fetch: async (url, options = {}) => {
       const requestUrl = new URL(url, origin);
@@ -112,12 +146,38 @@ function page({ token, authorize = true, restore = true, role = 'staff',
       else body = { data: [] };
       const override = respond?.(path, options);
       if (override) { body = override.body; status = override.status ?? 200; }
-      return { ok: status >= 200 && status < 300, status, json: async () => body };
+      return { ok: status >= 200 && status < 300, status, json: async () => body, blob: async () => body };
     }
   });
   vm.runInContext(source.replace('import.meta.env.VITE_API_BASE_URL', JSON.stringify(apiBase)), context);
-  return { context, element, storage, calls, rendered: () => rendered, disabledAutoSelect: () => disabledAutoSelect, url: () => currentUrl };
+  return { context, element, storage, calls, rendered: () => rendered, disabledAutoSelect: () => disabledAutoSelect, url: () => currentUrl,
+    googleButtonWidths, resizeGoogleSignIn(width) { element('google-signin').clientWidth = width; googleResizeCallback?.(); } };
 }
+
+test('Google sign-in fits a narrow container and responds to orientation changes without duplicate renders', async () => {
+  const app = page({ googleWidth: 246.75 });
+  await flush();
+  assert.deepEqual(app.googleButtonWidths, [246]);
+  app.resizeGoogleSignIn(246);
+  assert.equal(app.rendered(), 1);
+  app.resizeGoogleSignIn(350);
+  assert.deepEqual(app.googleButtonWidths, [246, 350]);
+  app.resizeGoogleSignIn(500);
+  assert.equal(app.googleButtonWidths.at(-1), 400);
+});
+
+test('Google sign-in waits for a visible container and survives hiding and reopening the login view', async () => {
+  const app = page({ googleWidth: 0 });
+  await flush();
+  assert.equal(app.rendered(), 0);
+  app.resizeGoogleSignIn(280);
+  assert.deepEqual(app.googleButtonWidths, [280]);
+  app.resizeGoogleSignIn(0);
+  app.resizeGoogleSignIn(280);
+  assert.equal(app.rendered(), 1);
+  app.resizeGoogleSignIn(246);
+  assert.deepEqual(app.googleButtonWidths, [280, 246]);
+});
 
 test('module login opens the received attention list without fetching statistics', async () => {
   const app = page({ token: 'sample', profile: { roles: ['ovp_pad'], office_id: 80, office_name: 'PAD Office' }, respond(path) {
@@ -158,7 +218,7 @@ test('a President opens a separate monitoring workspace even with an old Router 
   await vm.runInContext('officeRouting.openUpload()', app.context);
   assert.equal(app.element('upload-modal').visible, undefined);
   assert.equal(app.calls.some((call) => call.path.endsWith('/routing/registration-options')), false);
-  assert.match(app.element('president-overview-content').innerHTML, /Memorandum<\/small><strong>382<\/strong>/);
+  assert.match(app.element('president-overview-content').innerHTML, /Memorandum<\/small><strong>600<\/strong>/);
   assert.equal(app.calls.some((call) => /doc_router|\/api\/admin\//.test(call.path)), false);
   assert.equal(app.calls.filter((call) => call.path.startsWith('/api/president/')).every((call) => call.options.headers.get('X-PAD-Role') === 'university_president'), true);
   await vm.runInContext('signOut()', app.context);

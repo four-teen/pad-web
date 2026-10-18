@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   // Vercel serves dist at /. Relative assets also support local Apache previews.
   base: './',
+  optimizeDeps: { include: ['pdfjs-dist/build/pdf.mjs'] },
   server: {
     // Support an existing local .env that uses /pad-api/public.
     proxy: {

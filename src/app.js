@@ -2,6 +2,7 @@ import { createDocRouter } from './doc_router/index.js';
 import { createStatistics } from './doc_router/statistics.js';
 import { createDatabaseManagement } from './database-management.js';
 import { createPresidentView } from './president/index.js';
+import { createAttachmentPreview } from './attachment-preview.js';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://padapi.sksu-orms.net').trim().replace(/\/+$/, '');
 const state = { token: localStorage.getItem('pad_access_token'), user: null, activeRole: null, offices: [], documents: [], admin: { overview: null, accounts: [], offices: [], officials: [] } };
@@ -18,12 +19,14 @@ const moduleRoleIds = ['ovp_pad', 'ovp_central_records', 'sksu_officials'];
 let adminTab = 'accounts';
 let pendingDeletion = null;
 let googleSignInPromise = null;
+let googleButtonResizeObserver = null;
 let signingIn = false;
 let roleRequest = 0;
 const officeStatistics = createStatistics({ state, api, byId, escapeHtml, formatDate });
 const presidentView = createPresidentView({ state, api, byId, escapeHtml, formatDate, downloadDocument, signOut,
   switchRole: () => showRolePicker(true).catch((error) => { byId('role-error').textContent = error.message; byId('role-error').classList.remove('d-none'); }) });
 const databaseManagement = createDatabaseManagement({ state, api, byId, escapeHtml, formatDate, isAdministrator, refreshAdmin: loadAdmin, downloadBackup: downloadAdministrativeBackup });
+const attachmentPreview = createAttachmentPreview({ state, byId, loadFile: loadDocumentFile });
 const officeRouting = createDocRouter({ state, api, byId, escapeHtml, formatDate, showNotice, apiState, changeSection, uploadModal, refreshAdmin: loadAdmin,
   resetStatistics: officeStatistics.reset });
 
@@ -88,6 +91,7 @@ async function showRolePicker(refresh = false) {
   presidentView.reset();
   localStorage.removeItem('pad_active_role');
   officeRouting.reset();
+  attachmentPreview.reset();
   databaseManagement.reset();
   [uploadModal, accountModal, officeModal, officialModal, detailModal, deleteModal].forEach((modal) => modal.hide());
   pendingDeletion = null;
@@ -149,6 +153,7 @@ async function showRolePicker(refresh = false) {
 
 async function enterAccountRole(role, requestedHash = '') {
   if (!accountRoles().includes(role)) return;
+  attachmentPreview.reset();
   const current = ++roleRequest;
   state.activeRole = role;
   const response = await api('/api/me');
@@ -739,6 +744,20 @@ async function downloadDocument(reference, fileName) {
   } catch (error) { showNotice(error.message); }
 }
 
+async function loadDocumentFile(reference, signal) {
+  const token = state.token;
+  const role = state.activeRole;
+  if (!token || !role) throw new Error('Sign in again before opening this attachment.');
+  const response = await fetch(`${API_BASE_URL}${apiPath('/api/documents/' + encodeURIComponent(reference) + '/download')}`, {
+    signal, headers: { Authorization: `Bearer ${token}`, 'X-PAD-Role': role },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || 'The attachment could not be opened.');
+  }
+  return response.blob();
+}
+
 async function downloadAdministrativeBackup(id) {
   if (!isAdministrator() || !Number.isSafeInteger(id) || id <= 0) return;
   try {
@@ -758,6 +777,7 @@ function signOut(message = 'Sign in with your authorized Google account.') {
   roleRequest++;
   presidentView.reset();
   officeRouting.reset();
+  attachmentPreview.reset();
   databaseManagement.reset();
   localStorage.removeItem('pad_access_token');
   localStorage.removeItem('pad_active_role');
@@ -799,6 +819,8 @@ window.handleGoogleCredential = async ({ credential } = {}) => {
 };
 
 function showGooglePlaceholder(message) {
+  googleButtonResizeObserver?.disconnect();
+  googleButtonResizeObserver = null;
   const target = byId('google-signin');
   target.innerHTML = '<button class="google-button-placeholder" type="button" disabled><span class="google-letter" aria-hidden="true">G</span>Continue with Google</button>';
   if (message) byId('auth-status').textContent = message;
@@ -834,7 +856,21 @@ async function loadGoogleSignIn() {
       const target = byId('google-signin');
       target.innerHTML = '';
       window.google.accounts.id.initialize({ client_id: config.client_id, callback: window.handleGoogleCredential, auto_select: false });
-      window.google.accounts.id.renderButton(target, { theme: 'outline', size: 'large', shape: 'rect', width: 330, text: 'signin_with' });
+      let renderedWidth = 0;
+      const renderButton = () => {
+        const width = Math.min(400, Math.floor(target.getBoundingClientRect().width));
+        // Hidden sign-in views report zero; render when they become visible again.
+        if (!width || width === renderedWidth) return;
+        target.innerHTML = '';
+        window.google.accounts.id.renderButton(target, { theme: 'outline', size: 'large', shape: 'rect', width, text: 'signin_with' });
+        renderedWidth = width;
+      };
+      renderButton();
+      googleButtonResizeObserver?.disconnect();
+      if (window.ResizeObserver) {
+        googleButtonResizeObserver = new window.ResizeObserver(renderButton);
+        googleButtonResizeObserver.observe(target);
+      }
       byId('auth-status').textContent = 'Choose your authorized Google account to continue.';
       return true;
     } catch (error) {
@@ -860,6 +896,12 @@ async function startApp() {
 }
 
 document.addEventListener('click', (event) => {
+  const attachmentButton = event.target.closest('[data-preview-attachment]');
+  if (attachmentButton) {
+    event.preventDefault();
+    attachmentPreview.open(attachmentButton.dataset.previewAttachment, attachmentButton.dataset.fileName);
+    return;
+  }
   const roleChoice = event.target.closest('[data-choose-role]');
   if (roleChoice) { chooseAccountRole(roleChoice.dataset.chooseRole); return; }
   const section = event.target.closest('[data-section]');

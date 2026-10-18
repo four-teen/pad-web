@@ -32,19 +32,22 @@ function fixture(respond) {
 }
 globalThis.window = { history: { replaceState() {} } };
 
-test('the overview shows every type with its distinct Act count and escapes monitored values', async () => {
+test('type cards show all recorded documents while the Acted section keeps its separate meaning', async () => {
   const app = fixture((path) => {
     if (path.startsWith('/api/president/statistics')) {
-      const data = presidentReport(); data.oldest_pending[0].subject = '<script>alert(1)</script>'; data.office_workload[0].name = '<Private office>'; data.acted_type_breakdown.push({ name: '<Private type>', documents: 0 }); return data;
+      const data = presidentReport(); data.oldest_pending[0].subject = '<script>alert(1)</script>'; data.office_workload[0].name = '<Private office>'; data.recorded_type_breakdown.push({ name: '<Private type>', documents: 0 }); return data;
     }
   });
   await app.view.enter();
   const html = app.byId('president-overview-content').innerHTML;
-  assert.match(html, /Memorandum<\/small><strong>382<\/strong>/);
+  assert.match(html, /Memorandum<\/small><strong>600<\/strong>/);
   assert.match(html, /Unacted Type<\/small><strong>0<\/strong>/);
-  assert.match(html, /Acted documents · selected period/);
+  assert.match(html, /All offices · All registration dates/);
+  assert.match(html, /<strong>1,486<\/strong> total documents/);
+  assert.match(html, /Acted by document type/);
+  assert.match(html, /Memorandum<\/strong><span>382<\/span>/);
   assert.match(html, /&lt;Private type&gt;<\/small><strong>0<\/strong>/);
-  assert.doesNotMatch(html, /Documents tracked|Awaiting action|Awaiting receipt|482/);
+  assert.doesNotMatch(html, /Memorandum<\/small><strong>(382|482)<\/strong>/);
   assert.match(html, /&lt;script&gt;/);
   assert.doesNotMatch(html, /<script>/);
   assert.match(app.byId('president-office-list').innerHTML, /&lt;Private office&gt;/);
@@ -64,6 +67,37 @@ test('report errors hide stale figures and permit correction and retry', async (
   failed = false; await app.view.loadReport();
   assert.equal(app.byId('president-report-error').textContent, '');
   assert.equal(app.byId('president-overview-content').classList.contains('d-none'), false);
+});
+
+test('recorded cards honor the returned type filter and show the matching all-date total', async () => {
+  const app = fixture((path) => {
+    if (!path.startsWith('/api/president/statistics')) return;
+    const data = presidentReport(); data.filters.document_type = 'Travel Order'; data.snapshot.total_documents = 400;
+    data.recorded_type_breakdown = [{ name: 'Travel Order', documents: 400 }];
+    return data;
+  });
+  await app.view.enter();
+  const html = app.byId('president-overview-content').innerHTML;
+  const cards = html.slice(html.indexOf('aria-label="All recorded documents'), html.indexOf('<div class="pres-overview-grid">'));
+  assert.match(html, /All registration dates · Travel Order/);
+  assert.match(html, /<strong>400<\/strong> total documents/);
+  assert.match(cards, /Travel Order<\/small><strong>400<\/strong>/);
+  assert.match(cards, /100% of total/);
+  assert.doesNotMatch(cards, /Memorandum/);
+});
+
+test('an empty registry displays configured types with honest zero counts and shares', async () => {
+  const app = fixture((path) => {
+    if (!path.startsWith('/api/president/statistics')) return;
+    const data = presidentReport(); data.snapshot.total_documents = 0;
+    data.recorded_type_breakdown = [{ name: 'Travel Order', documents: 0 }];
+    return data;
+  });
+  await app.view.enter();
+  const html = app.byId('president-overview-content').innerHTML;
+  assert.match(html, /Travel Order<\/small><strong>0<\/strong>/);
+  assert.match(html, /0% of total/);
+  assert.doesNotMatch(html, /NaN|Infinity/);
 });
 
 test('a report in flight cannot restore global figures after role reset', async () => {

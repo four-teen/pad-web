@@ -184,6 +184,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     const permissions = document.permissions || {};
     const viewLabel = routing.queue === 'all' ? 'Show Time Line' : 'View';
     const buttons = document.is_my_document && permissions.delete ? [] : [`<button type="button" class="btn btn-outline-secondary" data-document="${escapeHtml(document.reference_no)}">${viewLabel}</button>`];
+    if (document.stored_file_name) buttons.push(`<button type="button" class="btn routing-attachment-button" data-preview-attachment="${escapeHtml(document.reference_no)}" data-file-name="${escapeHtml(document.file_name || document.reference_no)}" aria-label="Preview attachment for ${escapeHtml(document.reference_no)}" title="${escapeHtml(document.file_name || 'Preview attachment')}"><i class="bx bx-paperclip" aria-hidden="true"></i><span>Attachment</span></button>`);
     const padReturn = routing.queue === 'pad_results' || document.is_pad_return;
     if (permissions.receive && !padReturn) buttons.push(actionButton(document, 'receive', 'Receive'));
     if (permissions.decide) buttons.push(actionButton(document, 'decide', 'Record decision & return'));
@@ -345,7 +346,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   }
 
   function documentFile(data) {
-    const download = data.stored_file_name ? `<a class="btn btn-outline-secondary btn-sm" href="/api/documents/${encodeURIComponent(data.reference_no)}/download" data-file-name="${escapeHtml(data.file_name)}"><i class="bx bx-download me-1"></i> ${escapeHtml(data.file_name)}</a>`
+    const download = data.stored_file_name ? `<button type="button" class="btn routing-attachment-button btn-sm" data-preview-attachment="${escapeHtml(data.reference_no)}" data-file-name="${escapeHtml(data.file_name || data.reference_no)}"><i class="bx bx-paperclip" aria-hidden="true"></i><span>Preview ${escapeHtml(data.file_name || 'attachment')}</span></button>`
       : '<p class="small text-muted mb-0">No document file uploaded yet. It can be attached later.</p>';
     const upload = data.permissions?.upload_file ? `<form id="document-attachment-form" data-reference="${escapeHtml(data.reference_no)}" class="mt-3">
       <div id="document-attachment-error" class="alert alert-danger d-none" role="alert"></div>

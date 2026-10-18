@@ -384,6 +384,37 @@
       <div class="modal-header"><h5 id="admin-delete-title" class="modal-title">Delete record?</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div id="admin-delete-error" class="alert alert-danger d-none" role="alert"></div><div id="admin-delete-record" class="mb-3"></div><p id="admin-delete-description"></p><p class="text-danger small mb-0">Deletion is permanent and cannot be undone.</p></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button id="admin-delete-submit" type="submit" class="btn btn-danger">Delete permanently</button></div>
     </form></div></div></div>
 
+    <div class="modal fade attachment-preview-modal" id="attachment-preview-modal" tabindex="-1" aria-labelledby="attachment-preview-title" aria-describedby="attachment-preview-reference" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header">
+          <span class="attachment-preview-icon" aria-hidden="true"><i class="bx bx-file-find"></i></span>
+          <div class="attachment-preview-heading"><p class="attachment-preview-eyebrow" id="attachment-preview-title">Attachment preview</p><h5 id="attachment-preview-filename" class="modal-title"></h5><span id="attachment-preview-reference" class="attachment-preview-reference"></span></div>
+          <button type="button" class="attachment-preview-close" data-bs-dismiss="modal" aria-label="Close attachment preview"><i class="bx bx-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="attachment-preview-toolbar">
+          <span id="attachment-preview-meta" class="attachment-preview-meta"></span>
+          <div id="attachment-preview-controls" class="attachment-preview-controls d-none" role="group" aria-label="Preview controls">
+            <div id="attachment-preview-pages" class="attachment-preview-page-controls d-none">
+              <button id="attachment-preview-previous" type="button" class="btn btn-sm btn-outline-secondary" aria-label="Previous page"><i class="bx bx-chevron-left" aria-hidden="true"></i></button>
+              <span id="attachment-preview-page" aria-live="polite"></span>
+              <button id="attachment-preview-next" type="button" class="btn btn-sm btn-outline-secondary" aria-label="Next page"><i class="bx bx-chevron-right" aria-hidden="true"></i></button>
+            </div>
+            <div class="attachment-preview-zoom-controls">
+              <button id="attachment-preview-zoom-out" type="button" class="btn btn-sm btn-outline-secondary" aria-label="Zoom out"><i class="bx bx-minus" aria-hidden="true"></i></button>
+              <span id="attachment-preview-zoom" aria-live="polite">100%</span>
+              <button id="attachment-preview-zoom-in" type="button" class="btn btn-sm btn-outline-secondary" aria-label="Zoom in"><i class="bx bx-plus" aria-hidden="true"></i></button>
+              <button id="attachment-preview-fit" type="button" class="btn btn-sm btn-outline-secondary">Fit</button>
+            </div>
+          </div>
+        </div>
+        <div class="attachment-preview-body modal-body">
+          <div id="attachment-preview-stage" class="attachment-preview-stage" tabindex="0" role="region" aria-label="Attachment content"></div>
+          <div id="attachment-preview-status" class="attachment-preview-status" role="status" aria-live="polite"></div>
+        </div>
+        <div class="modal-footer"><span class="attachment-preview-footer-note"><i class="bx bx-check-shield" aria-hidden="true"></i> View first. Save a copy when you need it.</span><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button><button id="attachment-preview-download" type="button" class="btn btn-primary" disabled><i class="bx bx-download me-1" aria-hidden="true"></i>Download</button></div>
+      </div></div>
+    </div>
+
     <script src="/assets/vendor/js/helpers.js"></script>
     <script src="/assets/js/config.js"></script>
     <script src="/assets/vendor/libs/jquery/jquery.js"></script>

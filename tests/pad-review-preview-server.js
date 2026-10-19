@@ -20,6 +20,8 @@ const documents = [
   { id: 8, subject: 'Incoming handoff for the College of Computer Studies', status: 'in_transit', current_office_id: 2, pending_office_id: 9, last_from_office_id: 2, last_sender_role: 'ovp_central_records' },
   { id: 9, subject: 'Approved campus request ready for final Records action', status: 'received', current_office_id: 2, last_from_office_id: 80, last_sender_role: 'ovp_pad', pad_decision: 'approved',
     last_route_notes: 'Approved and signed by PAD. Central Records may finalize and file the attached copy.', file_name: 'signed-campus-request.pdf', stored_file_name: 'sample-signed.pdf' },
+  { id: 10, subject: 'Document returned because supporting papers are incomplete', status: 'received', current_office_id: 2,
+    last_from_office_id: 9, last_sender_role: 'sksu_officials', movement_type: 'return', is_issue_return: true, last_route_notes: 'Please include the supporting papers.' },
   ...['approved', 'disapproved', 'returned_for_correction'].map((decision, index) => ({ id: 4 + index,
     subject: ['Campus maintenance schedule', 'Request for additional funding', 'Travel authority with missing supporting papers'][index],
     status: index === 1 ? 'received' : 'in_transit', current_office_id: index === 1 ? 2 : 80, pending_office_id: index === 1 ? null : 2,
@@ -29,18 +31,22 @@ const documents = [
   source_office_id: 9, source_office_name: offices[2].name, pending_office_id: null, movement_type: 'forward',
   last_received_at: '2026-10-07 01:00:00', last_dispatched_at: '2026-10-07 01:30:00', last_receipt_action: 'received', last_received_by_name: 'Sample Receiver',
   created_at: '2026-10-06 01:00:00', updated_at: '2026-10-07 01:30:00', pad_return_office_name: offices[0].name,
+  encoding_office_id: data.is_my_document ? 9 : 2,
   file_name: null, stored_file_name: null, ...data }));
 const inQueue = (d, queue, office) => ({
   attention: d.current_office_id === office && !d.pending_office_id && !d.is_my_document && (['created', 'received'].includes(d.status) || (d.status === 'delivered' && d.pad_decision === 'returned_for_correction')),
   incoming: d.pending_office_id === office,
   my_documents: d.current_office_id === office && d.is_my_document && !d.pending_office_id,
-  received: d.current_office_id === office && !d.is_my_document && !d.pending_office_id && ['created', 'received'].includes(d.status),
+  received: d.current_office_id === office && !d.is_my_document && !d.pending_office_id && ['created', 'received'].includes(d.status)
+    && !(office === 2 && d.last_sender_role === 'ovp_pad' && d.pad_decision),
+  for_action: office === 2 && d.current_office_id === office && !d.pending_office_id && d.status === 'received'
+    && d.last_sender_role === 'ovp_pad' && Boolean(d.pad_decision),
   for_approval: d.current_office_id === office && !d.pending_office_id && d.awaiting_pad_decision,
-  pad_results: ['in_transit', 'received'].includes(d.status) && Boolean(d.pad_decision) && (d.pending_office_id === office || (!d.pending_office_id && d.current_office_id === office)),
   outgoing: d.last_from_office_id === office && Boolean(d.pending_office_id),
-  returned: d.movement_type === 'return' && (d.pending_office_id === office || (!d.pending_office_id && d.current_office_id === office)),
+  returned: d.movement_type === 'return' && !d.pad_decision && (d.pending_office_id === office || (!d.pending_office_id && d.current_office_id === office)),
   acted: (d.status === 'acted' && d.current_office_id === office) || d.release_records_office_id === office,
-  delivered: ['completed', 'delivered'].includes(d.status), all: true,
+  delivered: ['completed', 'delivered'].includes(d.status),
+  all: [2, 80].includes(office) || d.encoding_office_id === office || d.last_from_office_id === office,
 })[queue];
 const data = (d, role) => {
   const office = roleOffices[role]?.id || 9;
@@ -50,12 +56,13 @@ const data = (d, role) => {
     pending_office_name: offices.find((o) => o.id === d.pending_office_id)?.name,
     last_from_office_name: offices.find((o) => o.id === d.last_from_office_id)?.name,
     is_pad_return: padReturn,
+    is_issue_return: d.is_issue_return || (d.movement_type === 'return' && !d.pad_decision),
     act_blockers: padReturn
       ? [...(!d.stored_file_name ? ['Open View and attach the document before marking it Acted.'] : []), ...(!d.last_route_notes ? ['The latest PAD route requires notes.'] : [])] : [],
     permissions: { receive: d.pending_office_id === office, decide: role === 'ovp_pad' && held && d.awaiting_pad_decision,
       route: held && !d.awaiting_pad_decision && !padReturn, delete: held && d.is_my_document,
       return: !padReturn && ((held && !d.awaiting_pad_decision) || d.pending_office_id === office) && Boolean(d.last_from_office_id) && d.last_from_office_id !== office,
-      act: padReturn, upload_file: !d.is_owner_release && (held || padReturn) },
+      act: padReturn && held && d.status === 'received', upload_file: !d.is_owner_release && (held || padReturn) },
     history: [{ action: 'created', destination_office_name: offices[2].name, acted_by_name: 'Sample Encoder', created_at: d.created_at },
       { action: 'received', origin_office_name: offices[0].name, destination_office_name: offices[1].name, acted_by_name: 'Sample Receiver', created_at: d.last_received_at },
       ...(d.pad_reviews || []).map((review) => ({ action: 'pad_decided', origin_office_name: offices[1].name, destination_office_name: offices[1].name,
@@ -99,13 +106,19 @@ createServer(async (request, response) => {
         processing_time: { registration_to_act: { seconds: null, samples: 0 }, office_handling: { seconds: 43200, samples: 4 }, act_to_delivery: { seconds: null, samples: 0 } } });
     }
     if (path === '/api/routing/workspace') {
+      // Optional browser QA delay; sample server only, never the real API.
+      const delay = Math.min(5000, Math.max(0, Number(process.env.PAD_PREVIEW_DELAY_MS) || 0));
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
       const queue = url.searchParams.get('queue') || 'all';
+      const globalTimeline = queue === 'all' && ['ovp_pad', 'ovp_central_records'].includes(role) && !url.searchParams.get('office_id');
       const search = (url.searchParams.get('search') || '').toLowerCase();
       const records = documents.filter((d) => inQueue(d, queue, office) && (!search || `${d.reference_no} ${d.subject} ${d.document_type}`.toLowerCase().includes(search)));
       if (queue === 'attention') records.sort((a, b) => String(a.last_received_at || a.created_at).localeCompare(String(b.last_received_at || b.created_at)) || a.id - b.id);
-      return reply({ data: records.map((d) => data(d, role)), office: roleOffices[role], can_monitor: role === 'ovp_central_records',
+      return reply({ data: records.map((d) => data(d, role)), office: globalTimeline ? null : roleOffices[role],
+        can_monitor: role === 'ovp_central_records' || (queue === 'all' && role === 'ovp_pad'),
+        can_read_all_timelines: ['ovp_pad', 'ovp_central_records'].includes(role),
         can_register: true, can_register_external: role === 'ovp_central_records', pagination: { page: 1, pages: 1, total: records.length },
-        counts: Object.fromEntries(['my_documents', 'incoming', 'received', 'for_approval', 'pad_results', 'outgoing', 'returned', 'acted', 'delivered', 'all'].map((key) => [key, documents.filter((d) => inQueue(d, key, office)).length])) });
+        counts: Object.fromEntries(['my_documents', 'incoming', 'received', 'for_approval', 'for_action', 'outgoing', 'returned', 'acted', 'delivered', 'all'].map((key) => [key, documents.filter((d) => inQueue(d, key, office)).length])) });
     }
     const match = path.match(/^\/api\/documents\/([A-Za-z0-9-]+)(?:\/(decide|receive|act))?$/);
     if (match) {
@@ -120,7 +133,7 @@ createServer(async (request, response) => {
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
       if (match[2] === 'act') {
         const owner = offices.find(o => o.id === payload.owner_office_id && o.id !== office);
-        if (!payload.hard_copy_received || !owner || !payload.notes?.trim()) return reply({message:'Confirm receipt, select the owner, and record the action.'},422);
+        if (!owner || !payload.notes?.trim()) return reply({message:'Select the owner and record the action.'},422);
         d.current_office_id = office; d.pending_office_id = owner.id; d.recipient_office_id = owner.id; d.status = 'in_transit';
         d.is_owner_release = true; d.release_records_office_id = office; d.release_owner_office_id = owner.id;
         d.last_from_office_id = office; d.last_sender_role = role; d.last_dispatched_at = now; d.movement_type = 'forward';

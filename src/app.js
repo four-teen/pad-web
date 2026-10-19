@@ -1,6 +1,7 @@
 import { createDocRouter } from './doc_router/index.js';
 import { createStatistics } from './doc_router/statistics.js';
 import { createDatabaseManagement } from './database-management.js';
+import { createFileCodeSettings } from './file-code-settings.js';
 import { createPresidentView } from './president/index.js';
 import { createAttachmentPreview } from './attachment-preview.js';
 
@@ -26,6 +27,7 @@ const officeStatistics = createStatistics({ state, api, byId, escapeHtml, format
 const presidentView = createPresidentView({ state, api, byId, escapeHtml, formatDate, downloadDocument, signOut,
   switchRole: () => showRolePicker(true).catch((error) => { byId('role-error').textContent = error.message; byId('role-error').classList.remove('d-none'); }) });
 const databaseManagement = createDatabaseManagement({ state, api, byId, escapeHtml, formatDate, isAdministrator, refreshAdmin: loadAdmin, downloadBackup: downloadAdministrativeBackup });
+const fileCodeSettings = createFileCodeSettings({ api, byId, escapeHtml, isAdministrator });
 const attachmentPreview = createAttachmentPreview({ state, byId, loadFile: loadDocumentFile });
 const officeRouting = createDocRouter({ state, api, byId, escapeHtml, formatDate, showNotice, apiState, changeSection, uploadModal, refreshAdmin: loadAdmin,
   resetStatistics: officeStatistics.reset });
@@ -93,6 +95,7 @@ async function showRolePicker(refresh = false) {
   officeRouting.reset();
   attachmentPreview.reset();
   databaseManagement.reset();
+  fileCodeSettings.reset();
   [uploadModal, accountModal, officeModal, officialModal, detailModal, deleteModal].forEach((modal) => modal.hide());
   pendingDeletion = null;
   state.documents = []; state.offices = [];
@@ -163,6 +166,7 @@ async function enterAccountRole(role, requestedHash = '') {
   presidentView.reset();
   officeRouting.reset();
   databaseManagement.reset();
+  fileCodeSettings.reset();
   setProfile();
   if (role === 'university_president') {
     byId('auth-view').classList.add('d-none');
@@ -176,7 +180,7 @@ async function enterAccountRole(role, requestedHash = '') {
   const routingRequested = isRoutingRole(role)
     ? requestedHash === '#doc_router' || requestedHash.startsWith('#doc_router/')
     : requestedHash.startsWith('#routing/') || requestedHash === '#documents';
-  if (role === 'admin' && ['accounts', 'offices', 'officials', 'database'].includes(requestedTab)) adminTab = requestedTab;
+  if (role === 'admin' && ['accounts', 'offices', 'officials', 'file-codes', 'database'].includes(requestedTab)) adminTab = requestedTab;
   const isDetail = routingRequested && requestedTab === 'document';
   if (routingRequested && !isDetail && !statisticsRequested) officeRouting.setQueue(requestedTab || 'all');
   const useQueue = routingRequested && requestedTab && !isDetail && !statisticsRequested;
@@ -423,10 +427,11 @@ function renderAdmin() {
 }
 
 function showAdminTab(tab) {
-  if (!isAdministrator() || !['accounts', 'offices', 'officials', 'database'].includes(tab)) return;
+  if (!isAdministrator() || !['accounts', 'offices', 'officials', 'file-codes', 'database'].includes(tab)) return;
   adminTab = tab;
-  ['accounts', 'offices', 'officials', 'database'].forEach((name) => byId('admin-' + name + '-panel').classList.toggle('d-none', name !== tab));
+  ['accounts', 'offices', 'officials', 'file-codes', 'database'].forEach((name) => byId('admin-' + name + '-panel').classList.toggle('d-none', name !== tab));
   if (tab === 'database') databaseManagement.load();
+  if (tab === 'file-codes') fileCodeSettings.load();
   document.querySelectorAll('[data-admin-nav]').forEach((item) => item.classList.toggle('active', !byId('section-admin').classList.contains('d-none') && item.dataset.adminNav === tab));
   if (!byId('section-admin').classList.contains('d-none')) window.history.replaceState(null, '', tab === 'accounts' ? '#admin' : '#admin/' + tab);
 }
@@ -600,6 +605,7 @@ async function saveAdminOffice(event) {
   };
   try {
     await api('/api/admin/offices' + (id ? '/' + id : ''), { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    officeRouting.invalidateOffices();
     officeModal.hide();
     await loadAdmin();
     await refreshWorkspace();
@@ -614,6 +620,7 @@ async function saveAdminOffice(event) {
 async function toggleAdminOffice(officeId, isActive) {
   try {
     await api('/api/admin/offices/' + officeId, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !isActive }) });
+    officeRouting.invalidateOffices();
     await loadAdmin();
     await refreshWorkspace();
     showNotice('Office routing status updated.', 'success');
@@ -697,6 +704,7 @@ async function confirmAdminDelete(event) {
   try {
     const collection = ({ account: 'accounts', office: 'offices', official: 'officials' })[kind];
     await api('/api/admin/' + collection + '/' + id, { method: 'DELETE' });
+    if (kind === 'office') officeRouting.invalidateOffices();
     pendingDeletion = null;
     deleteModal.hide();
     await loadAdmin();
@@ -779,6 +787,7 @@ function signOut(message = 'Sign in with your authorized Google account.') {
   officeRouting.reset();
   attachmentPreview.reset();
   databaseManagement.reset();
+  fileCodeSettings.reset();
   localStorage.removeItem('pad_access_token');
   localStorage.removeItem('pad_active_role');
   state.token = null; state.user = null; state.activeRole = null; state.documents = []; state.offices = [];
@@ -933,6 +942,7 @@ document.addEventListener('click', (event) => {
 officeRouting.bind();
 officeStatistics.bind();
 databaseManagement.bind();
+fileCodeSettings.bind();
 byId('document-search').addEventListener('input', officeRouting.search);
 byId('status-filter').addEventListener('change', officeRouting.search);
 byId('origin-type').addEventListener('change', officeRouting.documentSource);

@@ -8,11 +8,13 @@ import { presidentReport, presidentOffices, presidentDocuments } from './preside
 const routingSource = readFileSync(new URL('../src/doc_router/index.js', import.meta.url), 'utf8').replace('export function createDocRouter', 'function createDocRouter');
 const statisticsSource = readFileSync(new URL('../src/doc_router/statistics.js', import.meta.url), 'utf8').replace('export function createStatistics', 'function createStatistics');
 const databaseSource = readFileSync(new URL('../src/database-management.js', import.meta.url), 'utf8').replace('export function createDatabaseManagement', 'function createDatabaseManagement');
+const fileCodeSource = readFileSync(new URL('../src/file-code-settings.js', import.meta.url), 'utf8').replace('export function createFileCodeSettings', 'function createFileCodeSettings');
 const presidentSource = readFileSync(new URL('../src/president/index.js', import.meta.url), 'utf8').replace('export function createPresidentView', 'function createPresidentView');
 const attachmentSource = readFileSync(new URL('../src/attachment-preview.js', import.meta.url), 'utf8').replace(/^export /gm, '');
-const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
+const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + fileCodeSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
   .replace("import { createDocRouter } from './doc_router/index.js';", '').replace("import { createStatistics } from './doc_router/statistics.js';", '')
   .replace("import { createDatabaseManagement } from './database-management.js';", '')
+  .replace("import { createFileCodeSettings } from './file-code-settings.js';", '')
   .replace("import { createAttachmentPreview } from './attachment-preview.js';", '')
   .replace("import { createPresidentView } from './president/index.js';", '');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
@@ -83,13 +85,14 @@ function page({ token, authorize = true, restore = true, role = 'staff',
   function element(id) {
     if (!elements.has(id)) {
       const classes = new Set(['app-view', 'role-view'].includes(id) || (id.startsWith('section-') && id !== 'section-dashboard') ? ['d-none'] : []);
+      const attributes = new Map();
       elements.set(id, {
         id, textContent: '', innerHTML: '', value: '', dataset: {}, clientWidth: id === 'google-signin' ? googleWidth : 0,
         getBoundingClientRect() { return { width: this.clientWidth }; },
         classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name),
           contains: (name) => classes.has(name), toggle: (name, on) => on ? classes.add(name) : classes.delete(name) },
         addEventListener(name, handler) { this[name] = handler; },
-        setAttribute() {}, reset() {}, focus() {}, scrollIntoView() {}, querySelectorAll: () => [],
+        setAttribute(name, value) { attributes.set(name, value); }, getAttribute(name) { return attributes.get(name); }, reset() {}, focus() {}, scrollIntoView() {}, querySelectorAll: () => [],
         replaceChildren() { this.innerHTML = ''; },
       });
     }
@@ -110,12 +113,17 @@ function page({ token, authorize = true, restore = true, role = 'staff',
     return item;
   });
   const registrationButtons = ['new-document-button', 'overview-register-button', 'statistics-register-button', 'documents-register-button'].map(element);
+  const queueCounts = ['incoming', 'received', 'for_action', 'outgoing', 'returned', 'all'].map((queue) => {
+    const item = element(`queue-count-${queue}`);
+    item.dataset.queueCount = queue;
+    return item;
+  });
   const user = { id: 1, name: 'Approved Staff', email: 'allowed@example.test', role, avatar_url: null, ...profile };
   const context = vm.createContext({
-    Headers, URL, URLSearchParams, Intl, Date, console, setTimeout, clearTimeout, FormData: formData,
+    Headers, URL, URLSearchParams, Intl, Date, console, setTimeout, clearTimeout, AbortController, FormData: formData,
     localStorage: { getItem: (key) => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     bootstrap: { Modal: class { constructor(target) { this.target = target; } hide() { this.target.visible = false; } show() { this.target.visible = true; } } },
-    document: { getElementById: element, addEventListener() {}, querySelectorAll: (selector) => selector === '.app-section' ? sections : selector === '[data-nav]' ? navigation : selector === '[data-open-upload], #new-document-button' ? registrationButtons : [],
+    document: { getElementById: element, addEventListener() {}, querySelectorAll: (selector) => selector === '.app-section' ? sections : selector === '[data-nav]' ? navigation : selector === '[data-queue-count]' ? queueCounts : selector === '[data-open-upload], #new-document-button' ? registrationButtons : [],
       head: { appendChild(script) { script.onload(); } }, createElement: () => ({ remove() {} }) },
     window: { crypto: webcrypto, jQuery: jquery, scrollTo() {}, addEventListener() {}, location: { origin, pathname, search: '', hash },
       ResizeObserver: class {
@@ -144,7 +152,7 @@ function page({ token, authorize = true, restore = true, role = 'staff',
       else if (path === '/api/admin/accounts') body = { data: accounts };
       else if (path === '/api/admin/offices') body = { data: offices };
       else body = { data: [] };
-      const override = respond?.(path, options);
+      const override = await respond?.(path, options, requestUrl);
       if (override) { body = override.body; status = override.status ?? 200; }
       return { ok: status >= 200 && status < 300, status, json: async () => body, blob: async () => body };
     }
@@ -308,6 +316,66 @@ const maintenanceInventory = { audit_ready: true, events: [], tables: [
 ] };
 const maintenanceReview = { label: 'Document registry', target: 'documents', counts: { documents: 2, document_routes: 4 }, total_records: 6, confirmation: 'CLEAR documents', token: 'fixture-operation-review' };
 
+const fileCodeData = { current_year: 2026, format: 'YY-NNNNN', selected: { year: 2026, last_number: 6548, next_number: 6549, preview: '26-06549' },
+  series: [{ year: 2026, last_number: 6548, next_number: 6549, preview: '26-06549' }] };
+
+test('administrator file code menu loads its form and previews and saves a new sequence', async () => {
+  const app = page({ token: 'sample', role: 'admin', hash: '#admin/file-codes', respond(path, options) {
+    if (path === '/api/admin/file-codes') {
+      if (options.method === 'PATCH') {
+        const selected = { year: 2026, last_number: 6999, next_number: 7000, preview: '26-07000' };
+        return { body: { data: { ...fileCodeData, selected, series: [selected] } } };
+      }
+      return { body: { data: fileCodeData } };
+    }
+  } });
+  await flush();
+  assert.equal(app.url(), '#admin/file-codes');
+  assert.equal(app.element('admin-file-codes-panel').classList.contains('d-none'), false);
+  assert.equal(app.element('admin-accounts-panel').classList.contains('d-none'), true);
+  assert.equal(app.element('file-code-year').value, '2026');
+  assert.equal(app.element('file-code-next').value, '6549');
+  assert.equal(app.element('file-code-preview').textContent, '26-06549');
+  app.element('file-code-next').value = '7000'; app.element('file-code-next').input();
+  assert.equal(app.element('file-code-preview').textContent, '26-07000');
+  await app.element('file-code-form').submit({ preventDefault() {} });
+  const request = app.calls.find(call => call.path === '/api/admin/file-codes' && call.options.method === 'PATCH');
+  assert.deepEqual(JSON.parse(request.options.body), { year: 2026, next_number: 7000, expected_next_number: 6549 });
+  assert.equal(request.options.headers.get('X-PAD-Role'), 'admin');
+  assert.match(app.element('file-code-success').textContent, /26-07000/);
+  assert.equal(app.element('file-code-save').disabled, false);
+});
+
+test('file code settings reject reused numbers and require a refresh after a stale save', async () => {
+  const app = page({ token: 'sample', role: 'admin', hash: '#admin/file-codes', respond(path, options) {
+    if (path === '/api/admin/file-codes') return options.method === 'PATCH'
+      ? { status: 409, body: { message: 'The file code series changed. Refresh the settings before saving again.' } }
+      : { body: { data: fileCodeData } };
+  } });
+  await flush();
+  for (const value of ['0', '6548', '6549.5', '4294967296']) {
+    app.element('file-code-next').value = value; app.element('file-code-next').input();
+    assert.equal(app.element('file-code-save').disabled, true);
+  }
+  app.element('file-code-next').value = '7000'; app.element('file-code-next').input();
+  await app.element('file-code-form').submit({ preventDefault() {} });
+  assert.match(app.element('file-code-error').textContent, /Refresh/);
+  assert.equal(app.element('file-code-save').disabled, true);
+  await app.element('file-code-refresh').click();
+  assert.equal(app.element('file-code-save').disabled, false);
+  vm.runInContext('signOut()', app.context);
+  assert.equal(app.element('file-code-preview').textContent, '—');
+  assert.equal(app.element('file-code-series').innerHTML, '');
+});
+
+test('office roles cannot open administrator file code settings', async () => {
+  const app = page({ token: 'sample', hash: '#admin/file-codes', profile: { roles: ['sksu_officials'], office_id: 2 } });
+  await flush();
+  vm.runInContext("showAdminTab('file-codes')", app.context);
+  assert.equal(app.calls.some(call => call.path.startsWith('/api/admin/file-codes')), false);
+  assert.equal(app.element('section-admin').classList.contains('d-none'), true);
+});
+
 test('administrator database page loads counts and protected-table explanations', async () => {
   const app = page({ token: 'sample', role: 'admin', hash: '#admin/database', respond(path) {
     if (path === '/api/admin/database') return { body: maintenanceInventory };
@@ -397,6 +465,74 @@ test('statistics has its own section and direct link, and Overview restores loca
   assert.equal(new URL(latest.url).searchParams.get('queue'), 'attention');
   assert.equal(new URL(latest.url).searchParams.has('office_id'), false);
   assert.equal(app.url(), '#doc_router');
+});
+
+test('OVP All Timeline shows the global office scope and restores own-office queues after leaving it', async () => {
+  for (const role of ['ovp_pad', 'ovp_central_records']) {
+    const office = { id: role === 'ovp_pad' ? 80 : 2, name: 'Assigned OVP office' };
+    const app = page({ token: 'sample', hash: '#doc_router/all', profile: { roles: [role], office_id: office.id }, respond(path, _options, url) {
+      if (path === '/api/offices') return { body: { data: [office, { id: 10, name: 'Another office' }] } };
+      if (path.endsWith('/routing/workspace')) {
+        const queue = url.searchParams.get('queue'); const selected = url.searchParams.get('office_id');
+        const global = queue === 'all' && !selected;
+        return { body: { data: [], office: global ? null : selected ? { id: Number(selected), name: 'Another office' } : office,
+          can_monitor: queue === 'all' || role === 'ovp_central_records', can_read_all_timelines: true,
+          counts: { all: global ? 25 : selected ? 3 : 25 }, desk_counts: { all: 25 }, pagination: { page: 1, pages: 1, total: 0 } } };
+      }
+    } });
+    await flush();
+    assert.equal(app.element('routing-office-filter').value, 'all');
+    assert.equal(app.element('routing-queue-office').textContent, 'All offices');
+    assert.match(app.element('routing-queue-description').textContent, /Documents from all offices/);
+    assert.equal(app.element('queue-count-all').textContent, 25);
+    assert.equal(app.element('routing-monitor-wrap').classList.contains('d-none'), false);
+    app.element('routing-office-filter').value = '10';
+    await app.element('routing-office-filter').change({ target: app.element('routing-office-filter') });
+    await flush();
+    assert.match(app.element('routing-queue-description').textContent, /selected office/);
+    await vm.runInContext("officeRouting.showQueue('incoming')", app.context);
+    const own = app.calls.filter(call => call.path.endsWith('/routing/workspace')).at(-1);
+    assert.equal(new URL(own.url).searchParams.has('office_id'), false);
+    assert.equal(app.element('routing-office-filter').value, String(office.id));
+    assert.equal(app.element('routing-monitor-wrap').classList.contains('d-none'), role === 'ovp_pad');
+    await vm.runInContext("officeRouting.showQueue('all')", app.context);
+    assert.equal(app.element('routing-office-filter').value, 'all');
+  }
+});
+
+test('ordinary All Timeline uses created-or-sent wording and keeps the office monitoring selector hidden', async () => {
+  const app = page({ token: 'sample', hash: '#doc_router/all', activeRole: 'sksu_officials', profile: { roles: ['ovp_pad', 'sksu_officials'], office_id: 9 }, respond(path) {
+    if (path.endsWith('/routing/workspace')) return { body: { data: [], office: { id: 9, name: 'Ordinary office' },
+      can_monitor: false, can_read_all_timelines: false, counts: { all: 4 }, pagination: { page: 1, pages: 1, total: 0 } } };
+  } });
+  await flush();
+  assert.match(app.element('routing-queue-description').textContent, /created or sent by your office/);
+  assert.equal(app.element('routing-monitor-wrap').classList.contains('d-none'), true);
+  assert.equal(app.element('queue-count-all').textContent, 4);
+});
+
+test('Outgoing refresh clears received handoffs from the list, navigation badge, and own-office dashboard count', async () => {
+  let received = false;
+  const pending = { ...approvalDocument, reference_no: '26-06549', subject: 'Pending PAD submission', status: 'in_transit',
+    current_office_id: 2, pending_office_id: 80, current_office_name: 'Central Records', pending_office_name: 'PAD', permissions: {} };
+  const app = page({ token: 'sample', hash: '#doc_router/outgoing', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/routing/workspace')) return { body: { data: received ? [] : [pending],
+      counts: { outgoing: received ? 0 : 1, all: 1 }, desk_counts: { outgoing: received ? 0 : 1, all: 1 },
+      office: { id: 2, name: 'Central Records' }, pagination: { page: 1, pages: 1, total: received ? 0 : 1 } } };
+  } });
+  await flush();
+  assert.equal(app.url(), '#doc_router/outgoing');
+  assert.match(app.element('document-list').innerHTML, /26-06549/);
+  assert.equal(app.element('queue-count-outgoing').textContent, 1);
+  assert.match(app.element('routing-queue-description').textContent, /awaiting receipt by the destination/);
+  received = true;
+  await vm.runInContext('officeRouting.refresh()', app.context);
+  assert.doesNotMatch(app.element('document-list').innerHTML, /26-06549/);
+  assert.match(app.element('document-list').innerHTML, /No documents in this queue/);
+  assert.equal(app.element('queue-count-outgoing').textContent, 0);
+  assert.equal(app.element('queue-count-all').textContent, 1);
+  assert.match(app.element('routing-stats').innerHTML, /data-open-queue="outgoing"[^]*?routing-stat-value">0</);
+  assert.equal(app.element('routing-document-count').textContent, 'No matching documents');
 });
 
 test('Overview renders all received records on the page and keeps its pagination independent from statistics', async () => {
@@ -952,17 +1088,25 @@ test('source selection is submitted separately from the registering office and s
 });
 
 
-test('PAD and Central Records get their own workflow cards and menus', async () => {
+test('PAD keeps For Approval, Records gets For Action, and every role retains Returned without PAD Results', async () => {
   for (const role of ['ovp_pad', 'ovp_central_records', 'sksu_officials']) {
     const app = page({ token: 'sample', role: 'staff', profile: { roles: [role], office_id: role === 'ovp_pad' ? 80 : 2 }, respond(path) {
-      if (path.includes('/routing/workspace')) return { body: { data: [], counts: { for_approval: 1, pad_results: 2 } } };
+      if (path.includes('/routing/workspace')) return { body: { data: [], counts: { for_approval: 1, for_action: 2, pad_results: 2 } } };
     } });
     await flush();
     const html = app.element('routing-stats').innerHTML;
     assert.equal(html.includes('data-open-queue="for_approval"'), role === 'ovp_pad');
-    assert.equal(html.includes('data-open-queue="pad_results"'), role === 'ovp_central_records');
+    assert.equal(html.includes('data-open-queue="for_action"'), role === 'ovp_central_records');
+    assert.equal(html.includes('data-open-queue="pad_results"'), false);
+    assert.equal(html.includes('data-open-queue="returned"'), true);
     assert.match(html, /Awaiting Receipt/);
   }
+  const markup = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(markup, /data-routing-queue="pad_results"|data-queue-count="pad_results"|routing-act-received/);
+  assert.match(markup, /data-routing-queue="returned"/);
+  assert.match(markup, /data-queue-count="returned"/);
+  assert.match(markup, /data-routing-queue="for_action"/);
+  assert.match(markup, /data-queue-count="for_action"/);
 });
 
 test('For Approval uses simple cards with sender, purpose and physical status', async () => {
@@ -1006,28 +1150,37 @@ test('PAD decision form requires reasons and sends the selected outcome through 
   assert.deepEqual(JSON.parse(call.options.body), { decision: 'returned_for_correction', notes: 'Attach the signed request.' });
 });
 
-test('PAD Results shows the decision while awaiting receipt and retains all review cycles in details', async () => {
+test('PAD decisions await a separate receipt with Receive, no Act, and retain all review cycles in details', async () => {
   const result = { ...approvalDocument, status: 'in_transit', awaiting_pad_decision: false, pending_office_id: 2,
+    is_pad_return: true, is_issue_return: false, movement_type: 'return',
     last_from_office_name: 'Exact PAD Office', last_sender_role: 'ovp_pad', pad_decision: 'approved',
     permissions: { receive: true, act: true, route: true, return: true }, pad_reviews: [
       { decision: 'returned_for_correction', decision_notes: '<script>Attach supporting papers</script>', decided_by_name: 'Sample PAD Staff', decided_at: '2026-10-06 01:00:00' },
       { decision: 'approved', decided_by_name: 'Sample PAD Staff', decided_at: '2026-10-07 01:00:00' },
     ] };
-  const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/pad_results', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
-    if (path.includes('/routing/workspace')) return { body: { data: [result] } };
+  const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/incoming', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.includes('/routing/workspace')) return { body: { data: [result], counts: { incoming: 1, returned: 0 } } };
     if (path.endsWith('/documents/PAD-2026-000777')) return { body: { data: result } };
   } });
   await flush();
-  assert.match(app.element('received-card-list').innerHTML, /OVP PAD/);
-  assert.match(app.element('received-card-list').innerHTML, /Approved/);
-  assert.match(app.element('received-card-list').innerHTML, /Awaiting receipt/);
-  assert.deepEqual(Array.from(app.element('received-card-list').innerHTML.matchAll(/<button[^>]*>(.*?)<\/button>/g), m => m[1]), ['View', 'Act']);
+  assert.match(app.element('document-list').innerHTML, /OVP PAD/);
+  assert.match(app.element('document-list').innerHTML, /Approved/);
+  assert.match(app.element('document-list').innerHTML, /Awaiting receipt/);
+  assert.doesNotMatch(app.element('document-list').innerHTML, /Returning/);
+  assert.deepEqual(Array.from(app.element('document-list').innerHTML.matchAll(/<button[^>]*>(.*?)<\/button>/g), m => m[1]), ['View', 'Receive']);
+  assert.equal(app.element('queue-count-returned').textContent, 0);
   await vm.runInContext("officeRouting.openDocument('PAD-2026-000777')", app.context);
   const detail = app.element('document-detail').innerHTML;
   assert.match(detail, /Review 1: Returned for correction/);
   assert.match(detail, /Review 2: Approved/);
   assert.match(detail, /Recorded by Sample PAD Staff/);
   assert.doesNotMatch(detail, /<script>/);
+  assert.match(detail, /data-routing-action="receive"/);
+  assert.doesNotMatch(detail, /data-routing-action="act"/);
+  vm.runInContext("officeRouting.handleClick({target:{closest:s=>s==='[data-routing-action]'?{dataset:{routingAction:'act',reference:'PAD-2026-000777'}}:null}})", app.context);
+  await flush();
+  assert.notEqual(app.element('routing-action-modal').visible, true);
+  assert.match(app.element('notice').textContent, /no longer available/);
 });
 
 
@@ -1035,7 +1188,7 @@ test('older PAD returns show a missing decision without inventing an outcome', a
   const document = { ...approvalDocument, current_office_id: 2, awaiting_pad_decision: false,
     last_from_office_name: 'Exact PAD Office', last_sender_role: 'ovp_pad', pad_result_unrecorded: true,
     permissions: { route: true }, pad_reviews: [] };
-  const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/pad_results', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+  const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/for_action', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
     if (path.includes('/routing/workspace')) return { body: { data: [document] } };
     if (path.endsWith('/documents/PAD-2026-000777')) return { body: { data: document } };
   } });
@@ -1044,6 +1197,37 @@ test('older PAD returns show a missing decision without inventing an outcome', a
   assert.doesNotMatch(app.element('received-card-list').innerHTML, /badge-pad-approved|badge-pad-disapproved/);
   await vm.runInContext("officeRouting.openDocument('PAD-2026-000777')", app.context);
   assert.match(app.element('document-detail').innerHTML, /No PAD decision has been recorded for this return/);
+});
+
+test('old PAD Results links open Awaiting Receipt without restoring a duplicate menu', async () => {
+  const app = page({ token: 'sample', hash: '#doc_router/pad_results', profile: { roles: ['ovp_central_records'], office_id: 2 } });
+  await flush();
+  assert.equal(app.url(), '#doc_router/incoming');
+  const request = app.calls.filter(call => call.path.endsWith('/routing/workspace')).at(-1);
+  assert.equal(new URL(request.url).searchParams.get('queue'), 'incoming');
+  assert.doesNotMatch(app.element('routing-stats').innerHTML, /data-open-queue="pad_results"/);
+});
+
+test('For Action opens directly for Records and shows every PAD outcome with its own count', async () => {
+  const outcomes = ['approved', 'disapproved', 'returned_for_correction'];
+  const records = outcomes.map((decision, index) => ({ ...approvalDocument, reference_no: `26-0655${index}`,
+    current_office_id: 2, pending_office_id: null, awaiting_pad_decision: false, is_pad_return: true,
+    last_sender_role: 'ovp_pad', pad_decision: decision, permissions: { act: true } }));
+  const app = page({ token: 'sample', hash: '#doc_router/for_action', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/routing/workspace')) return { body: { data: records, counts: { for_action: 3, received: 0, incoming: 0 },
+      pagination: { page: 1, pages: 1, total: 3 } } };
+  } });
+  await flush();
+  assert.equal(app.url(), '#doc_router/for_action');
+  assert.equal(app.element('routing-queue-title').textContent, 'For Action');
+  assert.equal(app.element('queue-count-for_action').textContent, 3);
+  assert.equal(app.element('queue-count-received').textContent, 0);
+  assert.equal(app.element('queue-count-incoming').textContent, 0);
+  const html = app.element('received-card-list').innerHTML;
+  for (const label of ['Approved', 'Disapproved', 'Returned for correction']) assert.ok(html.includes(label));
+  assert.equal((html.match(/data-routing-action="act"/g) || []).length, 3);
+  assert.doesNotMatch(html, /data-routing-action="receive"/);
+  assert.match(app.element('routing-stats').innerHTML, /data-open-queue="for_action"[^]*?routing-stat-value">3</);
 });
 
 
@@ -1158,19 +1342,44 @@ test('Act explains missing prerequisites and displays escaped latest routing not
   assert.match(app.element('document-detail').innerHTML, /&lt;script&gt;PAD instructions&lt;\/script&gt;/);
 });
 
-test('Act confirms hard-copy receipt, sends to the selected owner, and opens the Acted archive', async () => {
-  let released = false;
+test('Records receives the PAD decision into For Action, then acts without a repeated receipt confirmation', async () => {
+  let received = false; let released = false;
   const reference = 'PAD-2026-000804';
   const pending = { reference_no: reference, subject: 'Signed campus request', status: 'in_transit', current_office_id: 80,
-    pending_office_id: 2, source_office_id: 9, is_pad_return: true, permissions: { act: true, receive: true }, history: [] };
+    pending_office_id: 2, source_office_id: 9, is_pad_return: true, permissions: { act: false, receive: true }, history: [] };
+  const confirmed = { ...pending, current_office_id: 2, pending_office_id: null, status: 'received', permissions: { act: true } };
   const sent = { ...pending, is_pad_return: false, is_owner_release: true, current_office_id: 2, pending_office_id: 9, permissions: {} };
-  const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/pad_results', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path, options) {
+  const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/incoming', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path, options, requestUrl) {
     if (path.endsWith('/offices')) return { body: { data: [{ id: 2, name: 'Records' }, { id: 80, name: 'PAD' }, { id: 9, name: 'College owner' }] } };
-    if (path.includes('/routing/workspace')) return { body: { data: [released ? sent : pending] } };
-    if (path.endsWith(`/documents/${reference}`)) return { body: { data: released ? sent : pending } };
+    if (path.includes('/routing/workspace')) {
+      const queue = requestUrl.searchParams.get('queue');
+      const document = released ? sent : received ? confirmed : pending;
+      const present = queue === 'incoming' ? !received : queue === 'for_action' ? received && !released : queue === 'received' ? false : true;
+      return { body: { data: present ? [document] : [], counts: { incoming: received ? 0 : 1, received: 0, for_action: received && !released ? 1 : 0 },
+        pagination: { page: 1, pages: 1, total: present ? 1 : 0 } } };
+    }
+    if (path.endsWith(`/documents/${reference}`)) return { body: { data: released ? sent : received ? confirmed : pending } };
+    if (path.endsWith('/receive') && options.method === 'POST') { received = true; return { body: { message: 'Receipt confirmed.' } }; }
     if (path.endsWith('/act') && options.method === 'POST') { released = true; return { body: { message: 'Acted and sent to owner.' } }; }
   } });
   await flush();
+  assert.deepEqual(Array.from(app.element('document-list').innerHTML.matchAll(/<button[^>]*>(.*?)<\/button>/g), m => m[1]), ['View', 'Receive']);
+  vm.runInContext(`officeRouting.handleClick({target:{closest:(selector)=>selector==='[data-routing-action]'?{dataset:{routingAction:'receive',reference:'${reference}'}}:null}})`, app.context);
+  await flush();
+  assert.equal(app.element('routing-action-title').textContent, 'Confirm hard-copy receipt');
+  assert.equal(app.element('routing-receipt-remark-wrap').classList.contains('d-none'), false);
+  for (const remark of ['Hard copy received.', 'Received for review.', 'Received for appropriate action.', 'Received for approval.', 'Received for signature.', 'Received for filing.', 'Other / custom remark']) {
+    assert.ok(app.element('routing-receipt-remark').innerHTML.includes(remark));
+  }
+  app.element('routing-receipt-remark').value = 'Hard copy received.';
+  await app.element('routing-action-form').submit({ preventDefault() {} });
+  assert.deepEqual(JSON.parse(app.calls.find(({ path }) => path.endsWith('/receive')).options.body), { notes: 'Hard copy received.' });
+  assert.deepEqual(app.calls.filter(({ path }) => path.endsWith('/routing/workspace')).map(({ url }) => new URL(url).searchParams.get('queue')), ['incoming', 'for_action']);
+  assert.equal(app.url(), '#doc_router/for_action');
+  assert.equal(app.element('routing-queue-title').textContent, 'For Action');
+  assert.equal(app.element('queue-count-for_action').textContent, 1);
+  assert.equal(app.element('queue-count-received').textContent, 0);
+  assert.equal(app.element('queue-count-incoming').textContent, 0);
   assert.deepEqual(Array.from(app.element('received-card-list').innerHTML.matchAll(/<button[^>]*>(.*?)<\/button>/g), m => m[1]), ['View', 'Act']);
   vm.runInContext(`officeRouting.handleClick({target:{closest:(selector)=>selector==='[data-routing-action]'?{dataset:{routingAction:'act',reference:'${reference}'}}:null}})`, app.context);
   await flush();
@@ -1178,22 +1387,21 @@ test('Act confirms hard-copy receipt, sends to the selected owner, and opens the
   assert.equal(app.element('routing-destination-wrap').classList.contains('d-none'), false);
   assert.equal(app.element('routing-destination').value, '9');
   assert.doesNotMatch(app.element('routing-destination').innerHTML, /value="2"/);
-  assert.equal(app.element('routing-act-received').required, true);
-  assert.equal(app.element('routing-act-received').checked, false);
+  assert.equal(app.element('routing-receipt-remark-wrap').classList.contains('d-none'), true);
   app.element('routing-notes').value = 'Checked the approved copy and released it to the college.';
-  await app.element('routing-action-form').submit({ preventDefault() {} });
-  assert.equal(app.calls.some(({ path }) => path.endsWith('/act')), false);
-  assert.match(app.element('routing-action-error').textContent, /Confirm.*hard copy/);
-  app.element('routing-act-received').checked = true;
   app.element('routing-destination').value = '';
   await app.element('routing-action-form').submit({ preventDefault() {} });
   assert.equal(app.calls.some(({ path }) => path.endsWith('/act')), false);
   app.element('routing-destination').value = '9';
   await app.element('routing-action-form').submit({ preventDefault() {} });
   const call = app.calls.find(({ path }) => path.endsWith('/act'));
-  assert.deepEqual(JSON.parse(call.options.body), { notes: 'Checked the approved copy and released it to the college.', owner_office_id: 9, hard_copy_received: true });
+  assert.deepEqual(JSON.parse(call.options.body), { notes: 'Checked the approved copy and released it to the college.', owner_office_id: 9 });
+  assert.equal(app.calls.filter(({ path }) => path.endsWith('/receive')).length, 1);
   assert.equal(call.options.headers.get('X-PAD-Role'), 'ovp_central_records');
   assert.equal(app.url(), '#doc_router/acted');
+  assert.deepEqual(app.calls.filter(({ path }) => path.endsWith('/routing/workspace')).map(({ url }) => new URL(url).searchParams.get('queue')), ['incoming', 'for_action', 'acted']);
+  assert.equal(app.calls.filter(({ path }) => path.endsWith('/offices')).length, 1);
+  assert.equal(app.element('queue-count-for_action').textContent, 0);
   assert.match(app.element('document-list').innerHTML, /Acted.*Awaiting owner receipt/);
   assert.equal(app.element('routing-action-modal').visible, false);
   let ownerReceived = false;
@@ -1210,5 +1418,109 @@ test('Act confirms hard-copy receipt, sends to the selected owner, and opens the
   assert.match(ownerApp.element('routing-action-description').textContent, /owner office.*records delivery/);
   await ownerApp.element('routing-action-form').submit({ preventDefault() {} });
   assert.equal(ownerApp.url(), '#doc_router/delivered');
+  assert.deepEqual(ownerApp.calls.filter(({ path }) => path.endsWith('/routing/workspace')).map(({ url }) => new URL(url).searchParams.get('queue')), ['incoming', 'delivered']);
   assert.match(ownerApp.element('document-list').innerHTML, /Delivered to owner/);
+});
+
+test('queue loaders hide stale actions, disable pagination, and keep the newest search busy until it finishes', async () => {
+  const pending = [];
+  let delay = false;
+  const workspace = (subject) => ({ body: { data: [{ ...approvalDocument, subject }], counts: {}, pagination: { page: 1, pages: 2, total: 30 } } });
+  const app = page({ token: 'sample', hash: '#doc_router/all', profile: { roles: ['ovp_pad'], office_id: 80 }, respond(path, options) {
+    if (delay && path.endsWith('/routing/workspace')) return new Promise((resolve) => pending.push({ resolve, signal: options.signal }));
+    if (path.endsWith('/routing/workspace')) return workspace('Original document');
+  } });
+  await flush(); delay = true;
+  const first = vm.runInContext('officeRouting.refresh()', app.context);
+  await flush();
+  assert.match(app.element('document-list').innerHTML, /spinner-border.*Loading documents/s);
+  assert.doesNotMatch(app.element('document-list').innerHTML, /Original document|data-routing-action/);
+  assert.equal(app.element('document-list').getAttribute('aria-busy'), 'true');
+  assert.equal(app.element('routing-next').disabled, true);
+  app.element('document-search').value = 'Newest';
+  const second = vm.runInContext('officeRouting.refresh()', app.context);
+  await flush();
+  assert.equal(pending[0].signal.aborted, true);
+  pending[0].resolve(workspace('Old response')); await first;
+  assert.equal(app.element('document-list').getAttribute('aria-busy'), 'true');
+  assert.match(app.element('document-list').innerHTML, /Loading documents/);
+  pending[1].resolve(workspace('Newest response')); await second;
+  assert.match(app.element('document-list').innerHTML, /Newest response/i);
+  assert.doesNotMatch(app.element('document-list').innerHTML, /Old response|Loading documents/);
+  assert.equal(app.element('document-list').getAttribute('aria-busy'), 'false');
+  assert.equal(app.element('routing-next').disabled, false);
+});
+
+test('overview and card queues show loaders and failures offer a working retry without old records', async () => {
+  for (const hash of ['', '#doc_router/for_approval']) {
+    let finish;
+    let mode = 'ready';
+    const app = page({ token: 'sample', hash, profile: { roles: ['ovp_pad'], office_id: 80 }, respond(path) {
+      if (!path.endsWith('/routing/workspace')) return;
+      if (mode === 'pending') return new Promise((resolve) => { finish = resolve; });
+      return { body: { data: [approvalDocument] } };
+    } });
+    await flush(); mode = 'pending';
+    const refresh = vm.runInContext('officeRouting.refresh()', app.context);
+    await flush();
+    const target = app.element(hash ? 'received-card-list' : 'overview-documents');
+    assert.match(target.innerHTML, /Loading documents/);
+    assert.equal(target.getAttribute('aria-busy'), 'true');
+    finish({ status: 503, body: { message: 'Temporary outage.' } }); await refresh;
+    assert.match(target.innerHTML, /could not be loaded.*data-retry-documents/s);
+    assert.doesNotMatch(target.innerHTML, /Campus request/);
+    assert.equal(target.getAttribute('aria-busy'), 'false');
+    mode = 'ready';
+    vm.runInContext("officeRouting.handleClick({target:{closest:s=>s==='[data-retry-documents]'?{}:null}})", app.context);
+    await flush();
+    assert.match(target.innerHTML, /Campus request/i);
+  }
+});
+
+test('office directory requests are shared, expire, invalidate after edits, and clear on role reset', async () => {
+  let now = Date.now(); let finish;
+  let delay = false;
+  const app = page({ token: 'sample', hash: '#doc_router/all', profile: { roles: ['ovp_pad'], office_id: 80 }, respond(path) {
+    if (path.endsWith('/offices') && delay) return new Promise(resolve => { finish = resolve; });
+  } });
+  await flush();
+  vm.runInContext(`Date = class extends Date { static now() { return ${now}; } }`, app.context);
+  await vm.runInContext('officeRouting.refresh(); officeRouting.refresh()', app.context);
+  await flush();
+  const officeCalls = () => app.calls.filter(({ path }) => path.endsWith('/offices')).length;
+  assert.equal(officeCalls(), 1);
+  vm.runInContext(`Date.now = () => ${now + 61000}`, app.context);
+  await vm.runInContext('officeRouting.refresh()', app.context);
+  assert.equal(officeCalls(), 2);
+  delay = true;
+  vm.runInContext('officeRouting.invalidateOffices(); officeRouting.refresh(); officeRouting.refresh()', app.context);
+  await flush();
+  assert.equal(officeCalls(), 3);
+  finish({ body: { data: [{ id: 9, name: 'Updated office' }] } }); await flush();
+  assert.match(app.element('routing-office-filter').innerHTML, /Updated office/);
+  vm.runInContext('officeRouting.reset()', app.context);
+  delay = false;
+  await vm.runInContext('officeRouting.refresh()', app.context);
+  assert.equal(officeCalls(), 4);
+  assert.doesNotMatch(app.element('routing-office-filter').innerHTML, /Updated office/);
+});
+
+test('role reset aborts a loading queue and a late response cannot restore documents', async () => {
+  let finish; let signal;
+  let delay = false;
+  const app = page({ token: 'sample', hash: '#doc_router/all', profile: { roles: ['ovp_pad'], office_id: 80 }, respond(path, options) {
+    if (delay && path.endsWith('/routing/workspace')) {
+      signal = options.signal;
+      return new Promise(resolve => { finish = resolve; });
+    }
+  } });
+  await flush(); delay = true;
+  const refresh = vm.runInContext('officeRouting.refresh()', app.context);
+  await flush();
+  vm.runInContext('officeRouting.reset()', app.context);
+  assert.equal(signal.aborted, true);
+  finish({ body: { data: [{ ...approvalDocument, subject: 'Private old response' }] } });
+  await refresh;
+  assert.doesNotMatch(app.element('document-list').innerHTML, /Private old response/);
+  assert.equal(app.element('document-list').getAttribute('aria-busy'), 'false');
 });

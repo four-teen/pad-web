@@ -40,6 +40,13 @@ const documentData = (record) => {
 const inQueue = (record, queue) => ({ incoming: record.pending_office_id === 1, received: record.current_office_id === 1 && !record.pending_office_id && ['created', 'received'].includes(record.status),
   outgoing: Boolean(record.pending_office_id) && record.last_from_office_id === 1, returned: record.movement_type === 'return', acted: record.status === 'acted', delivered: ['completed', 'delivered'].includes(record.status), all: true })[queue];
 let sequence = 1000;
+const fileCodeYear = Number(new Intl.DateTimeFormat('en', { year: 'numeric', timeZone: 'Asia/Manila' }).format(new Date()));
+const fileCodeSeries = new Map([[fileCodeYear, 6548]]);
+const fileCodeSettings = (year) => {
+  const row = (value, last) => ({ year: value, last_number: last, next_number: last + 1, preview: `${String(value).slice(-2)}-${String(last + 1).padStart(5, '0')}` });
+  const series = new Map(fileCodeSeries); if (!series.has(year)) series.set(year, 0);
+  return { current_year: fileCodeYear, format: 'YY-NNNNN', selected: row(year, series.get(year)), series: [...series].sort((a, b) => b[0] - a[0]).map(([value, last]) => row(value, last)) };
+};
 const officeData = () => offices.map((office) => ({ ...office, officials: officials.filter((official) => Number(official.office_id) === office.id), user_count: accounts.filter((account) => Number(account.office_id) === office.id).length, document_count: 0, route_count: 0 }));
 const accountData = () => accounts.map((account) => {
   const assigned = (id) => offices.find((office) => office.id === Number(id));
@@ -64,6 +71,17 @@ const server = createServer(async (request, response) => {
         ...(activeOffice ? { office_id: activeOffice.id, office_name: activeOffice.name, office_campus: activeOffice.campus } : {}) } });
     }
     if (path.startsWith('/api/admin/') && selectedRole !== 'admin') return reply({ message: 'Administrator access is required.' }, 403);
+    if (path === '/api/admin/file-codes') {
+      if (request.method === 'PATCH') {
+        let raw = ''; for await (const chunk of request) raw += chunk;
+        const input = JSON.parse(raw);
+        if (input.expected_next_number !== (fileCodeSeries.get(input.year) || 0) + 1) return reply({ message: 'The file code series changed. Refresh the settings before saving again.' }, 409);
+        if (input.next_number < input.expected_next_number) return reply({ message: 'Issued or reserved numbers cannot be reused.' }, 422);
+        fileCodeSeries.set(input.year, input.next_number - 1);
+        return reply({ data: fileCodeSettings(input.year), message: 'File code settings saved.' });
+      }
+      return reply({ data: fileCodeSettings(Number(url.searchParams.get('year') || fileCodeYear)) });
+    }
     if (path.startsWith('/api/doc_router/')) {
       if (!['ovp_pad', 'ovp_central_records', 'sksu_officials'].includes(selectedRole)) return reply({ message: 'Select an office role.' }, 403);
       path = '/api/' + path.slice('/api/doc_router/'.length);

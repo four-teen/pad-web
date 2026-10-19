@@ -61,19 +61,19 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     my_documents: { title: 'My Document', description: 'Documents encoded by your office and ready to send. Sent documents move to Outgoing; their destination confirms receipt.', icon: 'bx-file', color: 'forest' },
     incoming: { title: 'Awaiting Receipt', description: 'Existing documents sent to this office. Confirm the hard-copy handoff; the document keeps its file code.', icon: 'bx-download', color: 'orange' },
     for_approval: { title: 'For Approval', description: 'Documents received from Central Records and awaiting a PAD decision. Record the decision and send them back to Central Records.', icon: 'bx-edit-alt', color: 'orange', role: 'ovp_pad' },
-    pad_results: { title: 'Returned from PAD', description: 'Documents sent back by PAD. View the timeline, or Act to confirm Records\' hard-copy receipt and send the result to its owner.', icon: 'bx-check-shield', color: 'info', role: 'ovp_central_records' },
-    received: { title: 'Received', description: 'Documents your office has received from another office or an outside source. Documents encoded by your own office appear in My Document.', icon: 'bx-check-circle', color: 'success' },
-    outgoing: { title: 'Outgoing', description: 'Documents your office sent onward, with their current progress.', icon: 'bx-send', color: 'forest' },
-    returned: { title: 'Returned', description: 'Documents returned to this office. Open the timeline to read the reason.', icon: 'bx-undo', color: 'danger' },
+    for_action: { title: 'For Action', description: 'PAD decisions received by Records and awaiting action. Review the outcome, then Act and send the result to its owner.', icon: 'bx-task', color: 'orange', role: 'ovp_central_records' },
+    received: { title: 'Received', description: 'Ordinary received handoffs and outside intake. PAD decisions received by Records appear in For Action; unsent office registrations appear in My Document.', icon: 'bx-check-circle', color: 'success' },
+    outgoing: { title: 'Outgoing', description: 'Documents sent by your office and awaiting receipt by the destination. After receipt, their history remains in All Timeline.', icon: 'bx-send', color: 'forest' },
+    returned: { title: 'Returned', description: 'Documents sent back to this office using Return because of an issue or concern. Open the timeline to read the reason.', icon: 'bx-undo', color: 'danger' },
     acted: { title: 'Acted', description: 'Records\' actions and dispatches to document owners. The owner confirms the final hard-copy delivery separately.', icon: 'bx-task', color: 'info' },
     delivered: { title: 'Delivered / completed', description: 'Delivered means the owner confirmed the final hard-copy handoff. Completed means processing was closed without a delivery handoff.', icon: 'bx-check-shield', color: 'success' },
-    all: { title: 'All Timeline', description: 'Every document your office registered, sent, or received.', icon: 'bx-history', color: 'muted' }
+    all: { title: 'All Timeline', description: 'Documents created or sent by your office, with their complete routing history.', icon: 'bx-history', color: 'muted' }
   };
   const actions = {
     route: { title: 'Send document', description: 'Select the next receiving office. The destination must confirm receipt before taking action.', label: 'Send document' },
     receive: { title: 'Confirm hard-copy receipt', description: 'Confirm that the hard copy has physically arrived at this office. This records the handoff on the existing PAD document number; it does not create another document record.', label: 'Confirm receipt' },
     return: { title: 'Return document', description: 'Return this document to the office that last sent it. A reason is required.', label: 'Return document', required: true },
-    act: { title: 'Act & send to owner', description: 'Confirm that Records has the hard copy from PAD, record the action taken, and send the attached document to its owner in one step. The owner confirms delivery when the hard copy arrives.', label: 'Act & send to owner', required: true },
+    act: { title: 'Act & send to owner', description: 'Record the action taken on the received PAD decision and send the attached document to its owner. The owner confirms delivery when the hard copy arrives.', label: 'Act & send to owner', required: true },
     delete: { title: 'Delete unsent document', description: 'Delete this unsent document and its attachment. This cannot be undone. Its file code will not be reused.', label: 'Delete document' },
     complete: { title: 'Complete document', description: 'Close processing for this document. It will remain available in the timeline.', label: 'Mark completed' },
     deliver: { title: 'Record delivery', description: 'Record the recipient and delivery details. This finishes the document routing process.', label: 'Record delivery', required: true }
@@ -92,7 +92,11 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   const availableQueues = () => Object.entries(queues).filter(([, queue]) => !queue.role || queue.role === state.activeRole);
   const actionModal = new bootstrap.Modal(byId('routing-action-modal'));
   let request = 0;
+  let workspaceController;
+  let officeDirectory = { data: null, expires: 0, pending: null };
   let detailRequest = 0;
+  let actionRequest = 0;
+  let actionController;
   let actionPending = null;
   let submissionKey = null;
   let searchTimer;
@@ -103,7 +107,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   let registrationOptions = { document_types: [], personnel: [], source_divisions: [] };
 
   function statusBadge(document) {
-    const labels = { created: 'My Document', in_transit: document.movement_type === 'return' ? 'Returning · awaiting receipt' : 'Awaiting receipt', acted: 'Acted', completed: 'Completed', delivered: 'Delivered' };
+    const issueReturn = document.is_issue_return ?? (document.movement_type === 'return' && !document.is_pad_return);
+    const labels = { created: 'My Document', in_transit: issueReturn ? 'Returning · awaiting receipt' : 'Awaiting receipt', acted: 'Acted', completed: 'Completed', delivered: 'Delivered' };
     const label = document.status === 'received'
       ? (document.last_receipt_action === 'received' ? 'Handoff received'
         : document.is_my_document ? 'My Document' : document.last_receipt_action === 'externally_received' ? 'Outside intake' : 'Receipt confirmed')
@@ -180,16 +185,20 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     return `<span class="routing-document-type" style="--document-type-color: ${documentTypeColors.get(type)}">${escapeHtml(type)}</span>`;
   }
 
+  function canAct(document) {
+    return Boolean(document.permissions?.act && document.status === 'received' && !document.pending_office_id);
+  }
+
   function actionButtons(document, layout = 'horizontal') {
     const permissions = document.permissions || {};
     const viewLabel = routing.queue === 'all' ? 'Show Time Line' : 'View';
     const buttons = document.is_my_document && permissions.delete ? [] : [`<button type="button" class="btn btn-outline-secondary" data-document="${escapeHtml(document.reference_no)}">${viewLabel}</button>`];
     if (document.stored_file_name) buttons.push(`<button type="button" class="btn routing-attachment-button" data-preview-attachment="${escapeHtml(document.reference_no)}" data-file-name="${escapeHtml(document.file_name || document.reference_no)}" aria-label="Preview attachment for ${escapeHtml(document.reference_no)}" title="${escapeHtml(document.file_name || 'Preview attachment')}"><i class="bx bx-paperclip" aria-hidden="true"></i><span>Attachment</span></button>`);
-    const padReturn = routing.queue === 'pad_results' || document.is_pad_return;
-    if (permissions.receive && !padReturn) buttons.push(actionButton(document, 'receive', 'Receive'));
+    const padReturn = document.is_pad_return;
+    if (permissions.receive) buttons.push(actionButton(document, 'receive', 'Receive'));
     if (permissions.decide) buttons.push(actionButton(document, 'decide', 'Record decision & return'));
     if (permissions.route && !padReturn) buttons.push(actionButton(document, 'route', 'Send'));
-    if (permissions.act) buttons.push(actionButton(document, 'act', 'Act'));
+    if (canAct(document)) buttons.push(actionButton(document, 'act', 'Act'));
     if (permissions.delete) buttons.push(actionButton(document, 'delete', 'Delete', 'outline-danger'));
     if (permissions.return && !padReturn) buttons.push(actionButton(document, 'return', 'Return', 'outline-danger'));
     const layoutClass = layout === 'stack' ? ' routing-action-stack' : '';
@@ -242,20 +251,22 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       : 'Your account needs an office assignment before you can register, send, or receive office documents. Ask your administrator to assign your office.';
     const title = queues[routing.queue];
     byId('routing-queue-title').textContent = title.title;
-    byId('routing-queue-description').textContent = title.description;
-    const isReceivedQueue = ['attention', 'my_documents', 'received', 'for_approval', 'pad_results'].includes(routing.queue);
+    byId('routing-queue-description').textContent = routing.queue === 'all' && workspace.can_read_all_timelines
+      ? office ? 'Documents involving the selected office, with their complete routing history.' : 'Documents from all offices, with their complete routing history.'
+      : title.description;
+    const isReceivedQueue = ['attention', 'my_documents', 'received', 'for_approval', 'for_action'].includes(routing.queue);
     byId('document-table-wrap').classList.toggle('d-none', isReceivedQueue);
     byId('received-card-list').classList.toggle('d-none', !isReceivedQueue);
     const showLocation = routing.queue !== 'incoming';
     byId('document-table-head').innerHTML = `<th class="routing-file-column">File code / date</th><th class="routing-particular-column">Particular</th>${showLocation ? '<th>Current location / destination</th>' : ''}<th class="routing-status-column">Status</th><th class="admin-actions-column">Actions</th>`;
-    const rows = state.documents.map(row).join('') || `<tr><td colspan="${showLocation ? 5 : 4}" class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>No documents in this queue.</td></tr>`;
+    const rows = !isReceivedQueue ? state.documents.map(row).join('') || `<tr><td colspan="${showLocation ? 5 : 4}" class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>No documents in this queue.</td></tr>` : '';
     byId('document-list').innerHTML = rows;
-    const cards = state.documents.map(receivedCard).join('') || '<div class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>No documents in this queue.</div>';
+    const cards = isReceivedQueue ? state.documents.map(receivedCard).join('') || '<div class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>No documents in this queue.</div>' : '';
     byId('received-card-list').innerHTML = cards;
     const { page, pages, total } = routing.pagination;
     if (routing.queue === 'attention') {
       byId('overview-office').textContent = state.user?.office_name || label;
-      byId('overview-documents').innerHTML = state.documents.map(receivedCard).join('') || '<div class="text-center text-muted py-5"><i class="bx bx-check-circle fs-2 d-block mb-2"></i>No received documents need attention in your office.</div>';
+      byId('overview-documents').innerHTML = state.documents.length ? cards : '<div class="text-center text-muted py-5"><i class="bx bx-check-circle fs-2 d-block mb-2"></i>No received documents need attention in your office.</div>';
       byId('overview-document-count').textContent = total ? `${(page - 1) * 20 + 1}–${Math.min(page * 20, total)} of ${total} documents · Page ${page} of ${pages}` : 'No received documents awaiting action';
       byId('overview-prev').disabled = page <= 1;
       byId('overview-next').disabled = page >= pages;
@@ -279,26 +290,59 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   function officeOptions() {
     const options = state.offices.map((office) => `<option value="${office.id}">${escapeHtml(office.name + (office.campus ? ` · ${office.campus}` : ''))}</option>`).join('');
     byId('routing-office-filter').innerHTML = '<option value="all">All offices</option>' + options;
-    byId('routing-office-filter').value = routing.scope || (state.user?.office_id ? String(state.user.office_id) : 'all');
+    byId('routing-office-filter').value = Object.hasOwn(routing.workspace, 'office')
+      ? String(routing.workspace.office?.id || 'all') : routing.scope || (state.user?.office_id ? String(state.user.office_id) : 'all');
+  }
+
+  function invalidateOffices() { officeDirectory = { data: null, expires: 0, pending: null }; }
+
+  function loadOffices() {
+    const cache = officeDirectory;
+    if (cache.data && Date.now() < cache.expires) return Promise.resolve(cache.data);
+    if (!cache.pending) cache.pending = api('/api/offices').then((response) => {
+      cache.data = response.data;
+      cache.expires = Date.now() + 60000;
+      return cache.data;
+    }).finally(() => { cache.pending = null; });
+    return cache.pending;
+  }
+
+  function loadingMarkup(message) {
+    return `<div class="routing-load-state" role="status"><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span><span>${message}</span></div>`;
+  }
+
+  function setLoading(loading) {
+    ['document-list', 'received-card-list', 'overview-documents'].forEach((id) => byId(id).setAttribute('aria-busy', String(loading)));
+    if (!loading) return;
+    const cards = ['attention', 'my_documents', 'received', 'for_approval', 'for_action'].includes(routing.queue);
+    byId('routing-queue-title').textContent = queues[routing.queue].title;
+    byId('routing-queue-description').textContent = 'Loading the latest documents for this queue…';
+    byId('document-table-wrap').classList.toggle('d-none', cards);
+    byId('received-card-list').classList.toggle('d-none', !cards);
+    const markup = loadingMarkup('Loading documents…');
+    byId('document-list').innerHTML = `<tr><td colspan="5">${markup}</td></tr>`;
+    byId('received-card-list').innerHTML = markup;
+    byId('overview-documents').innerHTML = markup;
+    ['routing-document-count', 'overview-document-count'].forEach((id) => { byId(id).textContent = 'Loading documents…'; });
+    ['routing-prev', 'routing-next', 'overview-prev', 'overview-next'].forEach((id) => { byId(id).disabled = true; });
   }
 
   async function refresh() {
+    clearTimeout(searchTimer);
     const overviewVisible = !byId('section-dashboard').classList.contains('d-none');
     if (overviewVisible) { routing.queue = 'attention'; routing.scope = ''; }
     if (!availableQueues().some(([key]) => key === routing.queue)) routing.queue = 'all';
     const current = ++request;
+    workspaceController?.abort();
+    const controller = new AbortController();
+    workspaceController = controller;
     const params = new URLSearchParams({ queue: routing.queue, page: String(routing.page), search: overviewVisible ? byId('overview-search').value || '' : byId('document-search').value || '', status: overviewVisible ? '' : byId('status-filter').value || '' });
     if (routing.scope) params.set('office_id', routing.scope);
-    byId('document-list').setAttribute('aria-busy', 'true');
-    if (overviewVisible) {
-      byId('overview-documents').setAttribute('aria-busy', 'true');
-      byId('overview-documents').innerHTML = '<div class="text-center text-muted py-5">Loading received documents…</div>';
-      byId('overview-prev').disabled = true; byId('overview-next').disabled = true;
-    }
+    setLoading(true);
     try {
-      const [offices, workspace] = await Promise.all([api('/api/offices'), api(`/api/routing/workspace?${params}`)]);
+      const [offices, workspace] = await Promise.all([loadOffices(), api(`/api/routing/workspace?${params}`, { signal: controller.signal })]);
       if (current !== request || !state.user) return;
-      state.offices = offices.data;
+      state.offices = offices;
       state.documents = workspace.data;
       routing.workspace = workspace;
       routing.counts = workspace.counts || {};
@@ -308,14 +352,18 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       render();
       apiState(true);
     } catch (error) {
-      if (current !== request) return;
+      if (current !== request || error.name === 'AbortError') return;
       apiState(false);
       showNotice(error.message);
-      if (overviewVisible) byId('overview-documents').innerHTML = '<div class="text-center text-muted py-5">Received documents could not be loaded. Open Overview to try again.</div>';
+      const markup = '<div class="routing-load-state flex-column" role="alert"><span>Documents could not be loaded.</span><button type="button" class="btn btn-sm btn-outline-primary" data-retry-documents>Try again</button></div>';
+      byId('document-list').innerHTML = `<tr><td colspan="5">${markup}</td></tr>`;
+      byId('received-card-list').innerHTML = markup;
+      byId('overview-documents').innerHTML = markup;
+      ['routing-document-count', 'overview-document-count'].forEach((id) => { byId(id).textContent = 'Loading failed'; });
     } finally {
       if (current === request) {
-        byId('document-list').setAttribute('aria-busy', 'false');
-        byId('overview-documents').setAttribute('aria-busy', 'false');
+        workspaceController = null;
+        setLoading(false);
       }
     }
   }
@@ -323,8 +371,10 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   function clearFilters() { byId('document-search').value = ''; byId('status-filter').value = ''; routing.page = 1; }
 
   async function showQueue(queue) {
+    if (queue === 'pad_results') queue = 'incoming';
     if (!availableQueues().some(([key]) => key === queue)) queue = 'all';
     clearFilters();
+    if (queue !== routing.queue && (queue === 'all' || routing.queue === 'all')) routing.scope = '';
     routing.queue = queue;
     changeSection('documents');
     window.history.replaceState(null, '', `#${prefix()}/${queue}`);
@@ -455,7 +505,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       const timeline = custodyTimeline(data);
       const buttons = [];
       for (const [key, label] of Object.entries({ receive: 'Receive', decide: 'Record decision & return', route: 'Send', return: 'Return', act: 'Act', delete: 'Delete', complete: 'Complete', deliver: 'Record delivery' })) {
-        if ((data.is_pad_return || routing.queue === 'pad_results') && key !== 'act') continue;
+        if (data.is_pad_return && !['receive', 'act'].includes(key)) continue;
+        if (key === 'act' && !canAct(data)) continue;
         if (data.permissions?.[key]) buttons.push(actionButton(data, key, label, ['return', 'delete'].includes(key) ? 'outline-danger' : 'outline-primary'));
       }
       byId('document-detail').innerHTML = `<div class="card-body p-4"><div class="journey-document-heading"><div><p class="reference-number mb-2">${escapeHtml(data.reference_no)}</p><h4 class="routing-timeline-title">${escapeHtml(String(data.subject || 'No Particular').toUpperCase())}</h4>
@@ -481,14 +532,23 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     return `<div class="pad-review-history mt-3"><h6>PAD decisions</h6>${reviews.map((review, index) => `<div class="border rounded p-3 mb-2"><strong>Review ${index + 1}: ${decisionLabels[review.decision]}</strong><small class="d-block text-muted">Recorded by ${escapeHtml(review.decided_by_name || 'PAD staff')} &middot; ${escapeHtml(formatDate(review.decided_at))}</small>${review.decision_notes ? `<p class="routing-remarks mb-0 mt-2">${escapeHtml(review.decision_notes)}</p>` : ''}</div>`).join('')}</div>`;
   }
 
-  async function openAction(action, reference) {
+  async function openAction(action, reference, trigger) {
     const settings = actions[action];
     if (!settings || acting) return;
+    const current = ++actionRequest;
+    actionController?.abort();
+    actionController = new AbortController();
+    const originalLabel = trigger?.innerHTML;
+    if (trigger) {
+      trigger.disabled = true;
+      trigger.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading…';
+    }
     try {
-      const { data } = await api(`/api/documents/${encodeURIComponent(reference)}`);
-      if (!data.permissions?.[action]) throw new Error('This action is no longer available for your office. Refresh the document.');
+      const { data } = await api(`/api/documents/${encodeURIComponent(reference)}`, { signal: actionController.signal });
+      if (current !== actionRequest || !state.user) return;
+      if (!data.permissions?.[action] || (action === 'act' && !canAct(data))) throw new Error('This action is no longer available for your office. Refresh the document.');
       if (action === 'act' && data.act_blockers?.length) throw new Error(data.act_blockers.join(' '));
-      actionPending = { action, reference };
+      actionPending = { action, reference, isPadReturn: Boolean(data.is_pad_return) };
       byId('routing-action-form').reset();
       byId('routing-action-error').classList.add('d-none');
       byId('routing-action-reference').textContent = reference;
@@ -504,10 +564,6 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       byId('routing-destination-help').textContent = action === 'act'
         ? 'Select the office that owns the document. Delivery is recorded when that office confirms receipt.'
         : 'The receiving office confirms the hard-copy handoff.';
-      byId('routing-act-receipt-wrap').classList.toggle('d-none', action !== 'act');
-      byId('routing-act-received').disabled = action !== 'act';
-      byId('routing-act-received').required = action === 'act';
-      byId('routing-act-received').checked = false;
       const destination = byId('routing-destination');
       const jquery = window.jQuery;
       const destinationSelect = jquery?.(destination);
@@ -545,7 +601,12 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       byId('routing-action-submit').classList.toggle('btn-danger', action === 'delete');
       byId('routing-action-submit').classList.toggle('btn-primary', action !== 'delete');
       actionModal.show();
-    } catch (error) { showNotice(error.message); }
+    } catch (error) {
+      if (current === actionRequest && error.name !== 'AbortError') showNotice(error.message);
+    } finally {
+      if (current === actionRequest) actionController = null;
+      if (trigger) { trigger.disabled = false; trigger.innerHTML = originalLabel; }
+    }
   }
 
   function updateReceiptRemark() {
@@ -561,7 +622,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     event.preventDefault();
     if (!actionPending || acting) return;
     acting = true;
-    const { action, reference } = actionPending;
+    const { action, reference, isPadReturn } = actionPending;
     const button = byId('routing-action-submit');
     button.disabled = true;
     button.textContent = 'Saving…';
@@ -578,11 +639,9 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       }
       if (action === 'route') payload.to_office_id = Number(byId('routing-destination').value);
       if (action === 'act') {
-        if (!byId('routing-act-received').checked) throw new Error('Confirm that Records has received the hard copy from PAD.');
         payload.owner_office_id = Number(byId('routing-destination').value);
         if (!Number.isInteger(payload.owner_office_id) || payload.owner_office_id <= 0) throw new Error('Select the owner office.');
         if (!payload.notes) throw new Error('Record the action taken before sending to the owner.');
-        payload.hard_copy_received = true;
       }
       if (action === 'decide') {
         payload.decision = byId('routing-decision').value;
@@ -594,11 +653,14 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
         : await api(`/api/documents/${encodeURIComponent(reference)}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       actionModal.hide();
       actionPending = null;
-      await refresh();
       if (action === 'act') { routing.detail = null; await showQueue('acted'); }
       else if (action === 'receive' && response.delivery_confirmed) { routing.detail = null; await showQueue('delivered'); }
+      else if (action === 'receive' && isPadReturn) { routing.detail = null; routing.scope = ''; await showQueue('for_action'); }
       else if (action === 'delete') { routing.detail = null; await showQueue('my_documents'); }
-      else if (!byId('section-track').classList.contains('d-none')) await openDocument(reference);
+      else {
+        await refresh();
+        if (!byId('section-track').classList.contains('d-none')) await openDocument(reference);
+      }
       showNotice(response.message, 'success');
     } catch (error) {
       byId('routing-action-error').textContent = error.message;
@@ -752,7 +814,10 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   }
 
   function reset() {
-    request++; detailRequest++; registrationRequest++; clearTimeout(searchTimer);
+    request++; detailRequest++; actionRequest++; registrationRequest++; clearTimeout(searchTimer);
+    workspaceController?.abort(); workspaceController = null;
+    actionController?.abort(); actionController = null;
+    invalidateOffices(); setLoading(false);
     resetStatistics?.();
     byId('overview-search').value = '';
     byId('overview-documents').innerHTML = '<div class="text-center text-muted py-5">Loading received documents…</div>';
@@ -763,6 +828,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   }
 
   function handleClick(event) {
+    if (event.target.closest('[data-retry-documents]')) { refresh(); return; }
     const attentionPage = event.target.closest('[data-attention-page]');
     if (attentionPage && !attentionPage.disabled) { routing.page += Number(attentionPage.dataset.attentionPage); refresh(); return; }
     const ownQueue = event.target.closest('[data-own-scope]');
@@ -777,7 +843,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     const shortcut = event.target.closest('[data-open-queue]');
     if (sidebar || shortcut) { event.preventDefault(); showQueue(sidebar ? sidebar.dataset.routingQueue : shortcut.dataset.openQueue); }
     const action = event.target.closest('[data-routing-action]');
-    if (action) openAction(action.dataset.routingAction, action.dataset.reference);
+    if (action) openAction(action.dataset.routingAction, action.dataset.reference, action);
     const page = event.target.closest('[data-routing-page]');
     if (page && !page.disabled) { routing.page += Number(page.dataset.routingPage); refresh(); }
     if (event.target.closest('[data-back-to-queue]')) {
@@ -802,8 +868,13 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     byId('travel-departure-date').addEventListener('change', () => { byId('travel-return-date').min = byId('travel-departure-date').value; });
   }
 
-  function search() { clearTimeout(searchTimer); routing.page = 1; searchTimer = setTimeout(refresh, 250); }
+  function search() {
+    clearTimeout(searchTimer); routing.page = 1;
+    request++; workspaceController?.abort();
+    setLoading(true);
+    searchTimer = setTimeout(refresh, 250);
+  }
 
-  return { refresh, render, row, openDocument, openUpload, uploadDocument, reset, handleClick, bind, search, documentSource, overview, showQueue, updateNavigation,
-    currentQueue: () => routing.queue, setQueue: (queue) => { if (availableQueues().some(([key]) => key === queue)) routing.queue = queue; } };
+  return { refresh, render, row, openDocument, openUpload, uploadDocument, reset, handleClick, bind, search, documentSource, overview, showQueue, updateNavigation, invalidateOffices,
+    currentQueue: () => routing.queue, setQueue: (queue) => { if (queue === 'pad_results') queue = 'incoming'; if (availableQueues().some(([key]) => key === queue)) routing.queue = queue; } };
 }

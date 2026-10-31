@@ -1507,10 +1507,10 @@ test('Records receives the PAD decision into For Action, then acts without a rep
   const reference = 'PAD-2026-000804';
   const pending = { reference_no: reference, subject: 'Signed campus request', status: 'in_transit', current_office_id: 80,
     pending_office_id: 2, source_office_id: 9, is_pad_return: true, permissions: { act: false, receive: true }, history: [] };
-  const confirmed = { ...pending, current_office_id: 2, pending_office_id: null, status: 'received', permissions: { act: true } };
+  const confirmed = { ...pending, current_office_id: 2, pending_office_id: null, status: 'received', pad_decision_notes: 'Please release the signed copy to the named offices.', permissions: { act: true } };
   const sent = { ...pending, is_pad_return: false, is_owner_release: true, current_office_id: 2, pending_office_id: 9, permissions: {} };
   const app = page({ token: 'sample', role: 'staff', hash: '#doc_router/incoming', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path, options, requestUrl) {
-    if (path.endsWith('/offices')) return { body: { data: [{ id: 2, name: 'Records' }, { id: 80, name: 'PAD' }, { id: 9, name: 'College owner' }] } };
+    if (path.endsWith('/offices')) return { body: { data: [{ id: 2, name: 'Records' }, { id: 80, name: 'PAD' }, { id: 9, name: 'College owner' }, { id: 10, name: 'Second owner' }] } };
     if (path.includes('/routing/workspace')) {
       const queue = requestUrl.searchParams.get('queue');
       const document = released ? sent : received ? confirmed : pending;
@@ -1543,26 +1543,29 @@ test('Records receives the PAD decision into For Action, then acts without a rep
   assert.deepEqual(Array.from(app.element('received-card-list').innerHTML.matchAll(/<button[^>]*>(.*?)<\/button>/g), m => m[1]), ['View', 'Act']);
   vm.runInContext(`officeRouting.handleClick({target:{closest:(selector)=>selector==='[data-routing-action]'?{dataset:{routingAction:'act',reference:'${reference}'}}:null}})`, app.context);
   await flush();
-  assert.equal(app.element('routing-action-title').textContent, 'Act & send to owner');
+  assert.equal(app.element('routing-action-title').textContent, 'Act & send to owner/offices');
   assert.equal(app.element('routing-destination-wrap').classList.contains('d-none'), false);
-  assert.equal(app.element('routing-destination').value, '9');
+  assert.equal(app.element('routing-destination').multiple, true);
   assert.doesNotMatch(app.element('routing-destination').innerHTML, /value="2"/);
   assert.equal(app.element('routing-receipt-remark-wrap').classList.contains('d-none'), true);
-  app.element('routing-notes').value = 'Checked the approved copy and released it to the college.';
+  assert.equal(app.element('routing-notes-wrap').classList.contains('d-none'), true);
+  assert.equal(app.element('routing-pad-final-note').textContent, 'Please release the signed copy to the named offices.');
   app.element('routing-destination').value = '';
+  app.element('routing-destination').selectedOptions = [];
   await app.element('routing-action-form').submit({ preventDefault() {} });
   assert.equal(app.calls.some(({ path }) => path.endsWith('/act')), false);
   app.element('routing-destination').value = '9';
+  app.element('routing-destination').selectedOptions = [{ value: '9' }, { value: '10' }];
   await app.element('routing-action-form').submit({ preventDefault() {} });
   const call = app.calls.find(({ path }) => path.endsWith('/act'));
-  assert.deepEqual(JSON.parse(call.options.body), { notes: 'Checked the approved copy and released it to the college.', owner_office_id: 9 });
+  assert.deepEqual(JSON.parse(call.options.body), { owner_office_ids: [9, 10] });
   assert.equal(app.calls.filter(({ path }) => path.endsWith('/receive')).length, 1);
   assert.equal(call.options.headers.get('X-PAD-Role'), 'ovp_central_records');
   assert.equal(app.url(), '#doc_router/acted');
   assert.deepEqual(app.calls.filter(({ path }) => path.endsWith('/routing/workspace')).map(({ url }) => new URL(url).searchParams.get('queue')), ['incoming', 'for_action', 'acted']);
   assert.equal(app.calls.filter(({ path }) => path.endsWith('/offices')).length, 1);
   assert.equal(app.element('queue-count-for_action').textContent, 0);
-  assert.match(app.element('document-list').innerHTML, /Acted.*Awaiting owner receipt/);
+  assert.match(app.element('document-list').innerHTML, /Acted.*Awaiting receipt at 1 of 1 owner offices/);
   assert.equal(app.element('routing-action-modal').visible, false);
   let ownerReceived = false;
   const ownerPending = { ...sent, permissions: { receive: true } };
@@ -1579,7 +1582,7 @@ test('Records receives the PAD decision into For Action, then acts without a rep
   await ownerApp.element('routing-action-form').submit({ preventDefault() {} });
   assert.equal(ownerApp.url(), '#doc_router/delivered');
   assert.deepEqual(ownerApp.calls.filter(({ path }) => path.endsWith('/routing/workspace')).map(({ url }) => new URL(url).searchParams.get('queue')), ['incoming', 'delivered']);
-  assert.match(ownerApp.element('document-list').innerHTML, /Delivered to owner/);
+  assert.match(ownerApp.element('document-list').innerHTML, /Delivered to this office/);
 });
 
 test('queue loaders hide stale actions, disable pagination, and keep the newest search busy until it finishes', async () => {

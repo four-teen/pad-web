@@ -54,7 +54,21 @@ export function createRecordsManagement({ state, api, byId, escapeHtml, formatDa
     const filtered = rows.filter((row) => [row.name, ...(personnel ? [row.email, row.position, row.campus] : [])].filter(Boolean).join(' ').toLowerCase().includes(search)
       && (!status || (status === 'active') === row.is_active));
     pages = Math.max(1, Math.ceil(filtered.length / 20)); page = Math.min(page, pages);
-    byId('management-list').innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Name</th>${personnel ? '<th>Email address</th><th>Position / designation</th><th>Campus</th>' : ''}<th>Status</th><th>Actions</th></tr></thead><tbody>${filtered.slice((page - 1) * 20, page * 20).map((row) => `<tr><td>${escapeHtml(row.name)}</td>${personnel ? ['email', 'position', 'campus'].map((field) => `<td>${row[field] ? escapeHtml(row[field]) : '<span class="text-muted">Not recorded</span>'}</td>`).join('') : ''}<td><span class="badge ${row.is_active ? 'bg-label-success' : 'bg-label-secondary'}">${row.is_active ? 'Active' : 'Inactive'}</span></td><td><button class="btn btn-sm btn-outline-primary" type="button" data-edit-catalog="${row.id}">Edit</button></td></tr>`).join('') || `<tr><td colspan="${personnel ? 6 : 3}" class="text-center text-muted py-4">No matching entries.</td></tr>`}</tbody></table></div>`;
+    const headings = personnel
+      ? '<th>Name / email</th><th>Position / designation</th><th>Campus</th>'
+      : '<th>Name</th>';
+    const entries = filtered.slice((page - 1) * 20, page * 20).map((row) => {
+      const identity = personnel
+        ? `<strong class="identity-name management-personnel-name">${escapeHtml(String(row.name || ''))}</strong><small class="identity-email text-muted management-personnel-email">${escapeHtml(String(row.email || 'Not recorded').toLowerCase())}</small>`
+        : escapeHtml(row.name);
+      const details = personnel
+        ? ['position', 'campus'].map((field) => `<td class="management-personnel-${field}">${row[field] ? escapeHtml(row[field]) : '<span class="text-muted">Not recorded</span>'}</td>`).join('')
+        : '';
+      const actionColumnClass = personnel ? '' : ' class="management-source-actions-column"';
+      return `<tr><td>${identity}</td>${details}<td><span class="badge ${row.is_active ? 'bg-label-success' : 'bg-label-secondary'}">${row.is_active ? 'Active' : 'Inactive'}</span></td><td${actionColumnClass}><button class="btn btn-sm btn-outline-primary" type="button" data-edit-catalog="${row.id}">Edit</button></td></tr>`;
+    }).join('');
+    const actionHeadingClass = personnel ? '' : ' class="management-source-actions-column"';
+    byId('management-list').innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle"><thead><tr>${headings}<th>Status</th><th${actionHeadingClass}>Actions</th></tr></thead><tbody>${entries || `<tr><td colspan="${personnel ? 5 : 3}" class="text-center text-muted py-4">No matching entries.</td></tr>`}</tbody></table></div>`;
     pagination(filtered.length);
   }
 
@@ -62,6 +76,27 @@ export function createRecordsManagement({ state, api, byId, escapeHtml, formatDa
     byId('management-count').textContent = `${total} ${tab === 'documents' ? 'records' : 'entries'} · Page ${page} of ${pages}`;
     byId('management-prev').disabled = page <= 1;
     byId('management-next').disabled = page >= pages;
+  }
+
+  function documentRow(row) {
+    const statuses = { created: 'Registered', in_transit: 'In transit', received: 'Received', acted: 'Acted', completed: 'Completed', delivered: 'Delivered' };
+    const status = String(row.status || '');
+    const statusClass = Object.hasOwn(statuses, status) ? status : 'created';
+    const statusLabel = statuses[status] || status.replaceAll('_', ' ') || 'Unknown status';
+    const reference = escapeHtml(row.reference_no || '');
+    return `<tr>
+      <td class="management-document-summary">
+        <div class="management-document-name">${escapeHtml(String(row.subject || 'Untitled document'))}</div>
+        <div class="management-document-meta">
+          <span class="reference-number management-document-code"><span class="visually-hidden">File code </span>${escapeHtml(String(row.reference_no || ''))}</span>
+          <span class="badge-status badge-${statusClass}">${escapeHtml(statusLabel)}</span>
+        </div>
+      </td>
+      <td class="management-document-actions-column"><div class="management-document-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-document="${reference}"><i class="bx bx-show" aria-hidden="true"></i> View</button>
+        ${row.permissions?.edit_particulars ? `<button type="button" class="btn btn-sm btn-outline-primary" data-edit-document="${reference}" data-edit-kind="particulars"><i class="bx bx-edit-alt" aria-hidden="true"></i> Edit particulars</button>` : ''}
+      </div></td>
+    </tr>`;
   }
 
   async function load() {
@@ -80,7 +115,7 @@ export function createRecordsManagement({ state, api, byId, escapeHtml, formatDa
       const response = await api(`/api/routing/workspace?${query}`);
       if (current !== request || !allowed()) return;
       pages = response.pagination.pages;
-      byId('management-list').innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>File code</th><th>Particulars / document name</th><th>Status</th><th>Actions</th></tr></thead><tbody>${response.data.map((row) => `<tr><td>${escapeHtml(row.reference_no)}</td><td style="white-space:pre-wrap;min-width:220px">${escapeHtml(row.subject)}</td><td>${escapeHtml(row.status.replaceAll('_', ' '))}</td><td><div class="d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-document="${escapeHtml(row.reference_no)}">View</button>${row.permissions?.edit_particulars ? `<button type="button" class="btn btn-sm btn-outline-primary" data-edit-document="${escapeHtml(row.reference_no)}" data-edit-kind="particulars">Edit particulars</button>` : ''}</div></td></tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted py-4">No matching documents.</td></tr>'}</tbody></table></div>`;
+      byId('management-list').innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle management-document-table"><thead><tr><th scope="col">Document</th><th scope="col" class="management-document-actions-column">Actions</th></tr></thead><tbody>${response.data.map(documentRow).join('') || '<tr><td colspan="2" class="text-center text-muted py-4">No matching documents.</td></tr>'}</tbody></table></div>`;
       pagination(response.pagination.total);
     } catch (err) {
       if (current !== request || !allowed()) return;

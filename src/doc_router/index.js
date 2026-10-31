@@ -61,19 +61,19 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     my_documents: { title: 'My Document', description: 'Documents encoded by your office and ready to send. Sent documents move to Outgoing; their destination confirms receipt.', icon: 'bx-file', color: 'forest' },
     incoming: { title: 'Awaiting Receipt', description: 'Existing documents sent to this office. Confirm the hard-copy handoff; the document keeps its file code.', icon: 'bx-download', color: 'orange' },
     for_approval: { title: 'For Approval', description: 'Documents received from Central Records and awaiting a PAD decision. Record the decision and send them back to Central Records.', icon: 'bx-edit-alt', color: 'orange', role: 'ovp_pad' },
-    for_action: { title: 'For Action', description: 'PAD decisions received by Records and awaiting action. Review the outcome, then Act and send the result to its owner.', icon: 'bx-task', color: 'orange', role: 'ovp_central_records' },
+    for_action: { title: 'For Action', description: 'PAD decisions received by Records and awaiting action. Review the PAD note, then Act and send the result to one or more owner offices.', icon: 'bx-task', color: 'orange', role: 'ovp_central_records' },
     received: { title: 'Received', description: 'Ordinary received handoffs and outside intake. PAD decisions received by Records appear in For Action; unsent office registrations appear in My Document.', icon: 'bx-check-circle', color: 'success' },
     outgoing: { title: 'Outgoing', description: 'Documents sent by your office and awaiting receipt by the destination. After receipt, their history remains in All Timeline.', icon: 'bx-send', color: 'forest' },
     returned: { title: 'Returned', description: 'Documents sent back to this office using Return because of an issue or concern. Open the timeline to read the reason.', icon: 'bx-undo', color: 'danger' },
-    acted: { title: 'Acted', description: 'Records\' actions and dispatches to document owners. The owner confirms the final hard-copy delivery separately.', icon: 'bx-task', color: 'info' },
-    delivered: { title: 'Delivered / completed', description: 'Delivered means the owner confirmed the final hard-copy handoff. Completed means processing was closed without a delivery handoff.', icon: 'bx-check-shield', color: 'success' },
+    acted: { title: 'Acted', description: 'Records\' actions and dispatches to document owners. Each selected owner office confirms its hard-copy receipt separately.', icon: 'bx-task', color: 'info' },
+    delivered: { title: 'Delivered / completed', description: 'Delivered means all selected owner offices confirmed their hard-copy receipt. Completed means processing was closed without a delivery handoff.', icon: 'bx-check-shield', color: 'success' },
     all: { title: 'All Timeline', description: 'Documents created or sent by your office, with their complete routing history.', icon: 'bx-history', color: 'muted' }
   };
   const actions = {
     route: { title: 'Send document', description: 'Select the next receiving office. The destination must confirm receipt before taking action.', label: 'Send document' },
     receive: { title: 'Confirm hard-copy receipt', description: 'Confirm that the hard copy has physically arrived at this office. This records the handoff on the existing PAD document number; it does not create another document record.', label: 'Confirm receipt' },
     return: { title: 'Return document', description: 'Return this document to the office that last sent it. A reason is required.', label: 'Return document', required: true },
-    act: { title: 'Act & send to owner', description: 'Record the action taken on the received PAD decision and send the attached document to its owner. The owner confirms delivery when the hard copy arrives.', label: 'Act & send to owner', required: true },
+    act: { title: 'Act & send to owner/offices', description: 'Apply the PAD decision and send the document to the selected owner offices. Each office confirms receipt of its hard copy.', label: 'Act & send to owner/offices' },
     delete: { title: 'Delete unsent document', description: 'Delete this unsent document and its attachment. This cannot be undone. Its file code will not be reused.', label: 'Delete document' },
     complete: { title: 'Complete document', description: 'Close processing for this document. It will remain available in the timeline.', label: 'Mark completed' },
     deliver: { title: 'Record delivery', description: 'Record the recipient and delivery details. This finishes the document routing process.', label: 'Record delivery', required: true }
@@ -113,14 +113,29 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       ? (document.last_receipt_action === 'received' ? 'Handoff received'
         : document.is_my_document ? 'My Document' : document.last_receipt_action === 'externally_received' ? 'Outside intake' : 'Receipt confirmed')
       : labels[document.status] || document.status;
-    const releaseLabel = document.is_owner_release && document.status === 'in_transit' ? 'Awaiting owner receipt'
-      : document.is_owner_release && document.status === 'delivered' ? 'Delivered to owner' : label;
-    const acted = document.is_owner_release ? '<span class="badge-status badge-acted me-1">Acted</span>' : '';
-    return `${acted}<span class="badge-status badge-${escapeHtml(document.status)}">${escapeHtml(releaseLabel)}</span>`;
+    const recordsReleaseView = state.activeRole === 'ovp_central_records';
+    const ownerReleaseView = ['sksu_officials', 'ovp_pad'].includes(state.activeRole);
+    const releasePendingCount = document.release_pending_count === undefined
+      ? Number(document.is_owner_release && document.status === 'in_transit') : Number(document.release_pending_count || 0);
+    const releaseRecipientCount = Number(document.release_recipient_count || (document.is_owner_release ? 1 : 0));
+    const ownerDeliveryReceived = ownerReleaseView && Boolean(document.owner_delivery_received || (document.is_owner_release && document.status === 'delivered'));
+    const releaseLabel = document.is_owner_release && recordsReleaseView
+      ? releasePendingCount ? `Awaiting receipt at ${releasePendingCount} of ${releaseRecipientCount} owner offices` : `Delivered to all ${releaseRecipientCount} owner offices`
+      : document.is_owner_release && ownerReleaseView && ownerDeliveryReceived ? 'Delivered to this office'
+        : document.is_owner_release && ownerReleaseView && document.status === 'in_transit' ? 'Awaiting owner receipt' : label;
+    const badgeStatus = document.is_owner_release && ownerDeliveryReceived ? 'delivered' : document.status;
+    const acted = document.is_owner_release && (recordsReleaseView || ownerReleaseView) ? '<span class="badge-status badge-acted me-1">Acted</span>' : '';
+    return `${acted}<span class="badge-status badge-${escapeHtml(badgeStatus)}">${escapeHtml(releaseLabel)}</span>`;
   }
 
   function officeName(name, campus) {
     return `<strong class="d-block routing-office-label">${escapeHtml(name || '—')}</strong>${campus ? `<small class="text-muted">${escapeHtml(campus)}</small>` : ''}`;
+  }
+
+  function ownerReleaseOffices(document) {
+    const recipients = document.release_recipients || [];
+    if (!recipients.length) return officeName(document.pending_office_name || document.recipient_office_name, document.pending_office_campus);
+    return recipients.map((recipient) => `<div class="mb-2">${officeName(recipient.office_name, recipient.office_campus)}<small class="text-muted">${recipient.received_at ? 'Receipt confirmed' : 'Awaiting receipt'}</small></div>`).join('');
   }
 
   function actionButton(document, action, label, style = 'outline-primary') {
@@ -226,10 +241,14 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
 
   function row(document) {
     const subject = String(document.subject || 'No Particular').toUpperCase();
+    const pendingDestination = document.pending_office_id
+      ? `<small class="d-block routing-pending mt-1"><i class="bx bx-right-arrow-alt"></i> ${escapeHtml(document.pending_office_name)} <span class="text-muted">· awaiting receipt</span></small>`
+      : document.is_owner_release && Number(document.release_pending_count) > 0
+        ? `<small class="d-block routing-pending mt-1"><i class="bx bx-right-arrow-alt"></i> Awaiting receipt at ${escapeHtml(document.release_pending_offices || `${document.release_pending_count} owner offices`)} </small>` : '';
     return `<tr><td class="routing-file-column"><span class="reference-number">${escapeHtml(document.reference_no)}</span><div class="routing-file-type">${documentTypeBadge(document)}</div>${documentDate(document)}</td>
       <td class="routing-particular-column"><div class="document-subject fw-semibold" title="${escapeHtml(subject)}">${document.is_my_document ? `<a href="#${prefix()}/document/${encodeURIComponent(document.reference_no)}" data-document="${escapeHtml(document.reference_no)}">${escapeHtml(subject)}</a>` : escapeHtml(subject)}</div><div class="routing-document-sender">${senderCell(document)}</div></td>
-      ${routing.queue === 'incoming' ? '' : `<td>${officeName(document.current_office_name, document.current_office_campus)}${document.pending_office_id ? `<small class="d-block routing-pending mt-1"><i class="bx bx-right-arrow-alt"></i> ${escapeHtml(document.pending_office_name)} <span class="text-muted">· awaiting receipt</span></small>` : ''}</td>`}
-      <td class="routing-status-column"><div class="routing-received-tags routing-status-badges mt-0">${reviewBadge(document)}${statusBadge(document)}</div></td><td class="admin-actions-column">${actionButtons(document, 'stack')}</td></tr>`;
+      ${routing.queue === 'incoming' ? '' : `<td>${officeName(document.current_office_name, document.current_office_campus)}${pendingDestination}</td>`}
+      <td class="routing-status-column"><div class="routing-received-tags routing-status-badges mt-0${routing.queue === 'acted' ? ' routing-acted-status' : ''}">${reviewBadge(document)}${statusBadge(document)}</div></td><td class="admin-actions-column">${actionButtons(document, 'stack')}</td></tr>`;
   }
 
   function render() {
@@ -526,12 +545,19 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
         if (key === 'act' && !canAct(data)) continue;
         if (data.permissions?.[key]) buttons.push(actionButton(data, key, label, ['return', 'delete'].includes(key) ? 'outline-danger' : 'outline-primary'));
       }
+      const releasePending = Number(data.release_pending_count || 0);
+      const officeLocation = data.pending_office_id
+        ? `Awaiting receipt at ${data.pending_office_name || 'destination office'}`
+        : releasePending ? `Awaiting receipt at ${data.release_pending_offices || `${releasePending} owner offices`}`
+          : data.current_office_name || 'Recorded office';
+      const releaseOfficeLabel = (data.release_recipients || []).length > 1 ? 'Owner offices'
+        : data.pending_office_id ? 'Awaiting receipt at' : 'Intended final office';
       byId('document-detail').innerHTML = `<div class="card-body p-4"><div class="journey-document-heading"><div><p class="reference-number mb-2">${escapeHtml(data.reference_no)}</p><h4 class="routing-timeline-title">${escapeHtml(String(data.subject || 'No Particular').toUpperCase())}</h4>
         <div class="routing-received-tags">${documentTypeBadge(data)}${statusBadge(data)}${reviewBadge(data)}</div></div></div>
         ${data.description && data.description !== data.subject ? `<p class="routing-remarks text-muted mb-4">${escapeHtml(data.description)}</p>` : ''}
         <details class="journey-overview"><summary><span><i class="bx bx-buildings" aria-hidden="true"></i> Offices & custody details</span>
-          <span class="journey-overview-location">${escapeHtml(data.pending_office_id ? `Awaiting receipt at ${data.pending_office_name || 'destination office'}` : data.current_office_name || 'Recorded office')} <i class="bx bx-chevron-down" aria-hidden="true"></i></span></summary>
-          <div class="row g-3 journey-offices"><div class="col-md-4"><small class="text-muted d-block">Origin</small>${officeName(sourceName(data), data.source_division_id ? null : data.source_office_campus)}</div><div class="col-md-4"><small class="text-muted d-block">Current holding office</small>${officeName(data.current_office_name, data.current_office_campus)}</div><div class="col-md-4"><small class="text-muted d-block">${data.pending_office_id ? 'Awaiting receipt at' : 'Intended final office'}</small>${officeName(data.pending_office_name || data.recipient_office_name, data.pending_office_campus)}</div></div>
+          <span class="journey-overview-location">${escapeHtml(officeLocation)} <i class="bx bx-chevron-down" aria-hidden="true"></i></span></summary>
+          <div class="row g-3 journey-offices"><div class="col-md-4"><small class="text-muted d-block">Origin</small>${officeName(sourceName(data), data.source_division_id ? null : data.source_office_campus)}</div><div class="col-md-4"><small class="text-muted d-block">Current holding office</small>${officeName(data.current_office_name, data.current_office_campus)}</div><div class="col-md-4"><small class="text-muted d-block">${releaseOfficeLabel}</small>${(data.release_recipients || []).length ? ownerReleaseOffices(data) : officeName(data.pending_office_name || data.recipient_office_name, data.pending_office_campus)}</div></div>
           ${custodySummary(data, timeline.currentStay, asOf)}</details>${journeyTimeline(data, timeline, asOf)}${changeHistory(data)}
         <section class="journey-document-tools" aria-label="Document file and actions"><h6>Document file & actions</h6>${documentFile(data)}
         ${buttons.length ? `<div class="routing-detail-actions mb-4"><div class="btn-group btn-group-sm" role="group" aria-label="Document actions">${buttons.join('')}</div></div>` : `<div class="alert alert-light border small mb-4">${data.pending_office_id ? 'Awaiting receipt by ' + escapeHtml(data.pending_office_name) + '. The destination office confirms receipt.' : ['acted', 'completed', 'delivered'].includes(data.status) ? 'This document is finished. Its full history is recorded in the journey above.' : 'Your office can follow this document through its timeline.'}</div>`}
@@ -571,27 +597,34 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       byId('routing-action-reference').textContent = reference;
       byId('routing-action-title').textContent = settings.title;
       byId('routing-action-description').textContent = settings.description + (action === 'return' ? ` Destination: ${data.last_from_office_name}.` : action === 'decide' ? ` Returning to: ${data.pad_return_office_name}.` : '');
-      if (action === 'receive' && data.is_owner_release) byId('routing-action-description').textContent = 'Confirm that the released hard copy has arrived at the owner office. This records delivery and moves the document to Delivered / completed. Records keeps its action in Acted.';
+      if (action === 'receive' && data.is_owner_release) byId('routing-action-description').textContent = 'Confirm that the released hard copy has arrived at this owner office. This records delivery for this office; overall delivery is complete after all selected owner offices confirm receipt. Records keeps its action in Acted.';
+      byId('routing-pad-final-note-wrap').classList.toggle('d-none', action !== 'act');
+      byId('routing-pad-final-note').textContent = action === 'act' ? String(data.pad_decision_notes || 'OVP PAD did not record a final note.') : '';
       byId('routing-decision-wrap').classList.toggle('d-none', action !== 'decide');
       byId('routing-decision').required = action === 'decide';
       byId('routing-decision').value = '';
       const sending = ['route', 'act'].includes(action);
       byId('routing-destination-wrap').classList.toggle('d-none', !sending);
-      byId('routing-destination-label').textContent = action === 'act' ? 'Owner office *' : 'Receiving office *';
+      byId('routing-destination-label').textContent = action === 'act' ? 'Owner offices *' : 'Receiving office *';
       byId('routing-destination-help').textContent = action === 'act'
-        ? 'Select the office that owns the document. Delivery is recorded when that office confirms receipt.'
+        ? 'Select every owner office receiving the document. Each selected office confirms its own hard-copy receipt.'
         : 'The receiving office confirms the hard-copy handoff.';
       const destination = byId('routing-destination');
+      const multipleOwners = action === 'act';
       const jquery = window.jQuery;
       const destinationSelect = jquery?.(destination);
       if (destinationSelect?.hasClass('select2-hidden-accessible')) destinationSelect.select2('destroy');
+      destination.multiple = multipleOwners;
       destination.required = sending;
       const sendingOffice = action === 'act' ? state.user?.office_id : data.current_office_id;
-      destination.innerHTML = '<option value="">Choose an office</option>' + receivingOffices().filter((office) => Number(office.id) !== Number(sendingOffice)).map((office) => `<option value="${office.id}">${escapeHtml(office.name + (office.campus ? ` · ${office.campus}` : ''))}</option>`).join('');
+      destination.innerHTML = (multipleOwners ? '' : '<option value="">Choose an office</option>') + receivingOffices().filter((office) => Number(office.id) !== Number(sendingOffice)).map((office) => `<option value="${office.id}">${escapeHtml(office.name + (office.campus ? ` · ${office.campus}` : ''))}</option>`).join('');
       destination.value = '';
       if (action === 'act') {
         const owner = !data.source_division_id ? data.source_office_id : null;
-        if (owner && Number(owner) !== Number(sendingOffice) && receivingOffices().some((office) => Number(office.id) === Number(owner))) destination.value = String(owner);
+        if (owner && Number(owner) !== Number(sendingOffice) && receivingOffices().some((office) => Number(office.id) === Number(owner))) {
+          const option = Array.from(destination.options || []).find((item) => Number(item.value) === Number(owner));
+          if (option) option.selected = true;
+        }
       }
       if (sending && jquery?.fn?.select2) {
         destinationSelect.select2({
@@ -599,7 +632,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
           width: '100%',
           placeholder: action === 'act' ? 'Search owner offices' : 'Search receiving offices',
           allowClear: true,
-          minimumResultsForSearch: 0
+          minimumResultsForSearch: 0,
+          closeOnSelect: !multipleOwners
         });
       }
       byId('routing-receipt-remark-wrap').classList.toggle('d-none', action !== 'receive');
@@ -609,9 +643,11 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
         + '<option value="custom">Other / custom remark</option>';
       byId('routing-receipt-remark').value = '';
       byId('routing-notes').value = '';
-      byId('routing-notes-wrap').classList.toggle('d-none', action === 'delete');
-      byId('routing-notes').disabled = action === 'delete';
-      byId('routing-notes').required = Boolean(settings.required);
+      byId('routing-notes-wrap').classList.toggle('d-none', action === 'delete' || action === 'act');
+      byId('routing-notes').disabled = action === 'delete' || action === 'act';
+      byId('routing-notes').readOnly = false;
+      byId('routing-notes').required = Boolean(settings.required) && action !== 'act';
+      byId('routing-notes').placeholder = 'Add a routing note';
       byId('routing-notes-label').textContent = action === 'deliver' ? 'Recipient and delivery details *' : action === 'return' ? 'Reason for return *' : settings.required ? 'Action taken *' : 'Remarks (optional)';
       if (action === 'receive') updateReceiptRemark();
       byId('routing-action-submit').textContent = settings.label;
@@ -656,9 +692,12 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       }
       if (action === 'route') payload.to_office_id = Number(byId('routing-destination').value);
       if (action === 'act') {
-        payload.owner_office_id = Number(byId('routing-destination').value);
-        if (!Number.isInteger(payload.owner_office_id) || payload.owner_office_id <= 0) throw new Error('Select the owner office.');
-        if (!payload.notes) throw new Error('Record the action taken before sending to the owner.');
+        const destination = byId('routing-destination');
+        const selected = Array.from(destination.selectedOptions || []).map((option) => Number(option.value)).filter((id) => Number.isInteger(id) && id > 0);
+        if (!selected.length && destination.value) selected.push(Number(destination.value));
+        payload.owner_office_ids = [...new Set(selected)];
+        delete payload.notes;
+        if (!payload.owner_office_ids.length) throw new Error('Select at least one owner office.');
       }
       if (action === 'decide') {
         payload.decision = byId('routing-decision').value;

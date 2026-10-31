@@ -15,6 +15,31 @@ body { background: #f7f8f7; color: var(--ct-ink); }
 #record-edit-modal .modal-body { overflow-y: auto; }
 #section-management td { overflow-wrap: anywhere; }
 #section-management td:last-child .d-flex { flex-wrap: wrap; }
+#management-list .management-personnel-name { color: #c34b08; white-space: normal; overflow-wrap: anywhere; }
+#management-list .management-personnel-email { white-space: normal; overflow-wrap: anywhere; }
+#management-list .management-personnel-position, #management-list .management-personnel-campus { text-transform: uppercase; }
+#management-list .management-source-actions-column { width: 1%; text-align: right; white-space: nowrap; }
+.management-document-table { width: 100%; table-layout: fixed; margin-bottom: 0; }
+.management-document-table > :not(caption) > * > * { padding: .65rem 1rem; }
+.management-document-table .management-document-name { font-size: .92rem; font-weight: 700; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; }
+.management-document-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; margin-top: .18rem; }
+.management-document-code { font-size: .8rem; font-weight: 800; letter-spacing: .045em; line-height: 1.3; text-transform: uppercase; overflow-wrap: anywhere; }
+.management-document-meta .badge-status { line-height: 1.3; }
+.management-document-meta .badge-in_transit { animation: none; }
+.management-document-meta .badge-delivered { color: #6935a0; background: #f0e8fa; }
+.management-document-table .management-document-actions-column { width: 14rem; }
+.management-document-actions { display: flex; align-items: center; justify-content: flex-start; gap: .3rem; white-space: nowrap; }
+.management-document-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-height: 2rem; padding: .3rem .4rem; font-size: .75rem; white-space: nowrap; }
+.management-document-actions .bx { font-size: 1rem; }
+@media (max-width: 575.98px) {
+  .management-document-table > :not(caption) > * > * { padding: .65rem .6rem; }
+  .management-document-table .management-document-name { font-size: .85rem; }
+  .management-document-table .management-document-actions-column { width: 12rem; }
+  .management-document-actions { gap: .2rem; }
+  .management-document-actions .btn { padding: .28rem .3rem; font-size: .7rem; }
+  .management-document-actions .bx { font-size: .9rem; }
+  .management-document-meta { gap: .2rem .5rem; }
+}
 /* Override the theme's pale text consistently across workspaces and dialogs. */
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { color: var(--ct-ink); }
 .text-body { color: var(--ct-ink) !important; }
@@ -162,7 +187,7 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { color: var(--ct-ink); }
 .badge-pad-approved { color: #006c45; background: #e0f3e8; }
 .badge-pad-disapproved { color: #a52b38; background: #fbe5e8; }
 .badge-pad-returned_for_correction { color: #8a5600; background: #fff0cf; }
-.badge-delivered { color: var(--ct-green-dark); background: var(--ct-green-soft); }
+.badge-delivered { color: var(--ct-green-dark); background: var(--ct-green-soft); border-radius: .25rem; padding: .35rem .7rem; }
 .metric-icon.danger { color: #b93c46; background: #fcebed; }
 .metric-icon.info { color: #216992; background: #e6f2fa; }
 .routing-stat { height: 100%; border: 1px solid transparent; font: inherit; background: #fff; transition: border-color .15s, box-shadow .15s; }
@@ -275,6 +300,21 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { color: var(--ct-ink); }
 .routing-table .admin-actions-column { width: 8.5rem; }
 .routing-table .routing-status-badges { flex-direction: column; align-items: flex-start; gap: .5rem; }
 .routing-table .routing-status-badges .badge-status { max-width: 100%; white-space: normal; }
+.routing-table .routing-acted-status { display: block; line-height: 1.5; }
+.routing-table .routing-acted-status .badge-pad-approved,
+.routing-table .routing-acted-status .badge-acted { padding: 0; border-radius: 0; color: var(--ct-green-dark); background: transparent; font-size: .8rem; font-weight: 600; white-space: normal; }
+.routing-table .routing-acted-status .badge-pad-approved::after,
+.routing-table .routing-acted-status .badge-pad-disapproved::after,
+.routing-table .routing-acted-status .badge-pad-returned_for_correction::after { content: ', '; }
+.routing-table .routing-acted-status .badge-acted.me-1 { margin-right: 0 !important; }
+.routing-table .routing-acted-status .badge-in_transit { margin-left: .3rem; padding: .35rem .7rem; border-radius: .25rem; color: #fff; background: var(--ct-green); box-shadow: none; animation: awaiting-status-background 2.5s ease-in-out infinite; }
+@keyframes awaiting-status-background {
+  0%, 100% { color: #fff; background: var(--ct-green); }
+  50% { color: #512900; background: var(--ct-orange); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .routing-table .routing-acted-status .badge-in_transit { animation: none; color: #fff; background: var(--ct-green); }
+}
 .routing-file-type { margin: .45rem 0; }
 .routing-document-sender { margin-top: .5rem; font-size: .82rem; }
 .routing-document-sender .routing-office-label { color: var(--ct-text-secondary); }
@@ -283,7 +323,7 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { color: var(--ct-ink); }
 .routing-received-card { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1rem 1.1rem; border: 1px solid #dfe5e1; border-radius: .6rem; background: #fff; box-shadow: 0 .1rem .4rem rgba(34, 48, 62, .06); }
 .routing-received-main { min-width: 0; flex: 1; }
 .routing-received-title { margin: 0 0 .45rem; font-size: 1rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
-.document-subject, .routing-received-title, .routing-timeline-title { font-family: 'Saira', 'Public Sans', sans-serif; color: #c34b08; text-transform: uppercase; }
+.document-subject, .routing-received-title, .routing-timeline-title, .management-document-name { font-family: 'Saira', 'Public Sans', sans-serif; color: #c34b08; text-transform: uppercase; }
 .document-subject a, .routing-received-title a { color: inherit; }
 .routing-received-meta { display: grid; gap: .12rem; color: var(--ct-ink); font-size: .82rem; line-height: 1.45; }
 .routing-received-meta strong { font-weight: 700; }

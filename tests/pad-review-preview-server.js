@@ -52,14 +52,15 @@ const data = (d, role) => {
   const office = roleOffices[role]?.id || 9;
   const held = d.current_office_id === office && !d.pending_office_id && ['created', 'received'].includes(d.status);
   const padReturn = role === 'ovp_central_records' && d.last_sender_role === 'ovp_pad' && (held || d.pending_office_id === office);
-  return { ...d, current_office_name: offices.find((o) => o.id === d.current_office_id)?.name,
+  return { description: d.subject, edit_version: String(d.revision || 1), document_type_id: 1, source_division_id: 301, external_sender: 'Sample campus source', personnel: [], changes: [], ...d, current_office_name: offices.find((o) => o.id === d.current_office_id)?.name,
     pending_office_name: offices.find((o) => o.id === d.pending_office_id)?.name,
     last_from_office_name: offices.find((o) => o.id === d.last_from_office_id)?.name,
     is_pad_return: padReturn,
     is_issue_return: d.is_issue_return || (d.movement_type === 'return' && !d.pad_decision),
     act_blockers: padReturn
       ? [...(!d.stored_file_name ? ['Open View and attach the document before marking it Acted.'] : []), ...(!d.last_route_notes ? ['The latest PAD route requires notes.'] : [])] : [],
-    permissions: { receive: d.pending_office_id === office, decide: role === 'ovp_pad' && held && d.awaiting_pad_decision,
+    permissions: { edit_particulars: role === 'ovp_central_records', edit_details: role === 'sksu_officials' && held && d.is_my_document,
+      receive: d.pending_office_id === office, decide: role === 'ovp_pad' && held && d.awaiting_pad_decision,
       route: held && !d.awaiting_pad_decision && !padReturn, delete: held && d.is_my_document,
       return: !padReturn && ((held && !d.awaiting_pad_decision) || d.pending_office_id === office) && Boolean(d.last_from_office_id) && d.last_from_office_id !== office,
       act: padReturn && held && d.status === 'received', upload_file: !d.is_owner_release && (held || padReturn) },
@@ -67,6 +68,11 @@ const data = (d, role) => {
       { action: 'received', origin_office_name: offices[0].name, destination_office_name: offices[1].name, acted_by_name: 'Sample Receiver', created_at: d.last_received_at },
       ...(d.pad_reviews || []).map((review) => ({ action: 'pad_decided', origin_office_name: offices[1].name, destination_office_name: offices[1].name,
         acted_by_name: review.decided_by_name, created_at: review.decided_at, notes: review.decision + ': ' + review.decision_notes })), ...(d.release_history || [])] };
+};
+const managementCatalogs = {
+  personnel: [{ id: 101, name: 'Sample Faculty One', email: 'faculty.one@example.test', position: 'Assistant Professor', campus: 'Isulan', is_active: true, version: '1' },
+    { id: 102, name: 'Sample Faculty Two', email: 'faculty.two@example.test', position: 'Instructor', campus: 'Tacurong', is_active: false, version: '1' }],
+  sources: [{ id: 301, name: 'Sample campus source', is_active: true, version: '1' }, { id: 302, name: 'Sample outside agency', is_active: true, version: '1' }]
 };
 const vite = await createViteServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
 createServer(async (request, response) => {
@@ -80,6 +86,38 @@ createServer(async (request, response) => {
     if (path === '/api/me') return reply({ user: { ...user, active_role: role, role_offices: roleOffices,
       ...(roleOffices[role] ? { office_id: office, office_name: roleOffices[role].name, office_campus: roleOffices[role].campus } : {}) } });
     if (path === '/api/offices') return reply({ data: offices });
+    if (path === '/api/routing/registration-options') return reply({ document_types: [{ id: 1, name: 'Memorandum', details_kind: 'personnel' }, { id: 7, name: 'TRAVEL ORDER', details_kind: 'travel_order' }],
+      personnel: managementCatalogs.personnel.filter(row => row.is_active), source_divisions: managementCatalogs.sources.filter(row => row.is_active) });
+    const catalogMatch = path.match(/^\/api\/routing\/management\/(personnel|sources)(?:\/(\d+))?$/);
+    if (catalogMatch) {
+      if (role !== 'ovp_central_records') return reply({ message: 'Central Records only.' }, 403);
+      const entries = managementCatalogs[catalogMatch[1]];
+      if (request.method === 'GET') return reply({ data: entries });
+      let body = ''; for await (const chunk of request) body += chunk;
+      const payload = JSON.parse(body || '{}');
+      const existing = entries.find(row => row.id === Number(catalogMatch[2]));
+      const details = catalogMatch[1] === 'personnel' ? { email: payload.email, position: payload.position, campus: payload.campus } : {};
+      if (existing) Object.assign(existing, { name: payload.name, is_active: payload.is_active, ...details, version: String(Number(existing.version) + 1) });
+      else entries.push({ id: Math.max(...entries.map(row => row.id)) + 1, name: payload.name, is_active: payload.is_active, ...details, version: '1' });
+      return reply({ message: 'Sample catalog saved.' });
+    }
+    const editMatch = path.match(/^\/api\/documents\/([A-Za-z0-9-]+)\/(particulars|details)$/);
+    if (editMatch && request.method === 'PATCH') {
+      const d = documents.find(row => row.reference_no === editMatch[1]);
+      if (!d) return reply({ message: 'Sample not found.' }, 404);
+      const record = data(d, role);
+      if (!record.permissions[editMatch[2] === 'particulars' ? 'edit_particulars' : 'edit_details']) return reply({ message: 'Edit unavailable.' }, 403);
+      let body = ''; for await (const chunk of request) body += chunk;
+      const payload = JSON.parse(body || '{}');
+      if (payload.version !== record.edit_version) return reply({ message: 'This sample changed. Reopen it.' }, 409);
+      const before = { subject: d.subject, description: d.description || d.subject };
+      if (editMatch[2] === 'particulars') { d.description = payload.description; d.subject = payload.description.slice(0, 255); }
+      else Object.assign(d, { document_type_id: Number(payload.document_type_id), external_sender: managementCatalogs.sources.find(row => String(row.id) === payload.source_division_id)?.name || record.external_sender });
+      d.revision = (d.revision || 1) + 1;
+      d.changes = [{ action: editMatch[2] === 'particulars' ? 'particulars_corrected' : 'details_updated', before, after: { subject: d.subject, description: d.description },
+        reason: payload.reason, actor_name: user.name, actor_role: role, created_at: new Date().toISOString() }, ...(d.changes || [])];
+      return reply({ message: 'Sample document updated.' });
+    }
     if (path === '/api/routing/statistics') {
       const global = role !== 'sksu_officials';
       const scoped = global ? documents : documents.filter(d => d.source_office_id === office || d.current_office_id === office || d.pending_office_id === office);

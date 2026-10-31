@@ -4,6 +4,7 @@ import { createDatabaseManagement } from './database-management.js';
 import { createFileCodeSettings } from './file-code-settings.js';
 import { createPresidentView } from './president/index.js';
 import { createAttachmentPreview } from './attachment-preview.js';
+import { createRecordsManagement } from './records-management.js';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://padapi.sksu-orms.net').trim().replace(/\/+$/, '');
 const state = { token: localStorage.getItem('pad_access_token'), user: null, activeRole: null, offices: [], documents: [], admin: { overview: null, accounts: [], offices: [], officials: [] } };
@@ -29,6 +30,7 @@ const presidentView = createPresidentView({ state, api, byId, escapeHtml, format
 const databaseManagement = createDatabaseManagement({ state, api, byId, escapeHtml, formatDate, isAdministrator, refreshAdmin: loadAdmin, downloadBackup: downloadAdministrativeBackup });
 const fileCodeSettings = createFileCodeSettings({ api, byId, escapeHtml, isAdministrator });
 const attachmentPreview = createAttachmentPreview({ state, byId, loadFile: loadDocumentFile });
+const recordsManagement = createRecordsManagement({ state, api, byId, escapeHtml, formatDate, changeSection, openDocument });
 const officeRouting = createDocRouter({ state, api, byId, escapeHtml, formatDate, showNotice, apiState, changeSection, uploadModal, refreshAdmin: loadAdmin,
   resetStatistics: officeStatistics.reset });
 
@@ -96,6 +98,7 @@ async function showRolePicker(refresh = false) {
   attachmentPreview.reset();
   databaseManagement.reset();
   fileCodeSettings.reset();
+  recordsManagement.reset();
   [uploadModal, accountModal, officeModal, officialModal, detailModal, deleteModal].forEach((modal) => modal.hide());
   pendingDeletion = null;
   state.documents = []; state.offices = [];
@@ -167,6 +170,7 @@ async function enterAccountRole(role, requestedHash = '') {
   officeRouting.reset();
   databaseManagement.reset();
   fileCodeSettings.reset();
+  recordsManagement.reset();
   setProfile();
   if (role === 'university_president') {
     byId('auth-view').classList.add('d-none');
@@ -195,6 +199,7 @@ async function enterAccountRole(role, requestedHash = '') {
   else await refreshWorkspace();
   if (current !== roleRequest) return;
   await loadAdmin();
+  if (role === 'ovp_central_records' && requestedTab === 'management') await recordsManagement.open(requestedHash.split('/')[2]);
   if (isDetail && requestedHash.split('/')[2]) await openDocument(decodeURIComponent(requestedHash.split('/')[2]));
 }
 
@@ -241,6 +246,7 @@ function setProfile() {
   byId('admin-nav-item').classList.toggle('d-none', !isAdministrator());
   byId('admin-nav-group').classList.toggle('d-none', !isAdministrator());
   document.querySelectorAll('[data-admin-only]').forEach((item) => item.classList.toggle('d-none', !isAdministrator()));
+  document.querySelectorAll('[data-records-management-only]').forEach((item) => item.classList.toggle('d-none', state.activeRole !== 'ovp_central_records' || !accountRoles().includes('ovp_central_records')));
   document.querySelectorAll('[data-routing-queue] a').forEach((link) => { link.href = `#${isRoutingRole() ? 'doc_router' : 'routing'}/${link.closest('[data-routing-queue]').dataset.routingQueue}`; });
   const image = byId('user-avatar');
   byId('user-initials').textContent = initials(user.name);
@@ -718,7 +724,8 @@ async function confirmAdminDelete(event) {
 
 function changeSection(section) {
   if (state.activeRole === 'university_president') return;
-  if (!['dashboard', 'statistics', 'documents', 'track', 'admin'].includes(section) || (section === 'admin' && !isAdministrator())) {
+  if (!['dashboard', 'statistics', 'documents', 'track', 'admin', 'management'].includes(section) || (section === 'admin' && !isAdministrator())
+    || (section === 'management' && (state.activeRole !== 'ovp_central_records' || !accountRoles().includes('ovp_central_records')))) {
     section = 'dashboard';
   }
   document.querySelectorAll('.app-section').forEach((element) => element.classList.toggle('d-none', element.id !== `section-${section}`));
@@ -728,6 +735,7 @@ function changeSection(section) {
   if (section === 'statistics' && state.user && state.activeRole) officeStatistics.load();
   if (section === 'admin') showAdminTab(adminTab);
   officeRouting.updateNavigation();
+  recordsManagement.markNavigation();
   if (window.Helpers && window.Helpers._toggleCollapsed) document.querySelector('.layout-overlay')?.click();
 }
 
@@ -782,6 +790,7 @@ function openUpload() { officeRouting.openUpload(); }
 async function uploadDocument(event) { await officeRouting.uploadDocument(event); }
 
 function signOut(message = 'Sign in with your authorized Google account.') {
+  recordsManagement.reset();
   roleRequest++;
   presidentView.reset();
   officeRouting.reset();
@@ -927,6 +936,7 @@ document.addEventListener('click', (event) => {
   if (event.target.closest('[data-open-upload]') || event.target.closest('#new-document-button')) openUpload();
   officeRouting.handleClick(event);
   databaseManagement.handleClick(event);
+  recordsManagement.handleClick(event);
   const adminNavigation = event.target.closest('[data-admin-nav]'); if (adminNavigation) { event.preventDefault(); changeSection('admin'); showAdminTab(adminNavigation.dataset.adminNav); }
   const editAccount = event.target.closest('[data-edit-account]'); if (editAccount) openAdminAccount(editAccount.dataset.editAccount);
   const editOffice = event.target.closest('[data-edit-office]'); if (editOffice) openAdminOffice(editOffice.dataset.editOffice);
@@ -943,6 +953,7 @@ officeRouting.bind();
 officeStatistics.bind();
 databaseManagement.bind();
 fileCodeSettings.bind();
+recordsManagement.bind();
 byId('document-search').addEventListener('input', officeRouting.search);
 byId('status-filter').addEventListener('change', officeRouting.search);
 byId('origin-type').addEventListener('change', officeRouting.documentSource);

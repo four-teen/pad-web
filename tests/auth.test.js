@@ -11,13 +11,173 @@ const databaseSource = readFileSync(new URL('../src/database-management.js', imp
 const fileCodeSource = readFileSync(new URL('../src/file-code-settings.js', import.meta.url), 'utf8').replace('export function createFileCodeSettings', 'function createFileCodeSettings');
 const presidentSource = readFileSync(new URL('../src/president/index.js', import.meta.url), 'utf8').replace('export function createPresidentView', 'function createPresidentView');
 const attachmentSource = readFileSync(new URL('../src/attachment-preview.js', import.meta.url), 'utf8').replace(/^export /gm, '');
-const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + fileCodeSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
+const recordsSource = readFileSync(new URL('../src/records-management.js', import.meta.url), 'utf8').replace('export function createRecordsManagement', 'function createRecordsManagement');
+const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + fileCodeSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + recordsSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
   .replace("import { createDocRouter } from './doc_router/index.js';", '').replace("import { createStatistics } from './doc_router/statistics.js';", '')
   .replace("import { createDatabaseManagement } from './database-management.js';", '')
   .replace("import { createFileCodeSettings } from './file-code-settings.js';", '')
   .replace("import { createAttachmentPreview } from './attachment-preview.js';", '')
+  .replace("import { createRecordsManagement } from './records-management.js';", '')
   .replace("import { createPresidentView } from './president/index.js';", '');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
+
+test('Records Management lists all-office particulars and keeps catalog entry controls separate', async () => {
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/routing/workspace')) return { body: { data: [{ reference_no: '26-00001', subject: '<Incorrect title>', status: 'completed', permissions: { edit_particulars: true } }], counts: {}, pagination: { page: 1, pages: 1, total: 1 } } };
+    if (path.endsWith('/management/personnel')) return { body: { data: [{ id: 1, name: '<Faculty name>', is_active: true, version: 'v1' }] } };
+  } });
+  await flush();
+  await vm.runInContext("recordsManagement.open('documents')", app.context);
+  assert.equal(app.url(), '#doc_router/management/documents');
+  assert.equal(app.element('section-management').classList.contains('d-none'), false);
+  assert.equal(app.element('section-dashboard').classList.contains('d-none'), true);
+  assert.match(app.element('management-list').innerHTML, /&lt;Incorrect title&gt;/);
+  assert.match(app.element('management-list').innerHTML, /Edit particulars/);
+  assert.equal(app.element('management-add').classList.contains('d-none'), true);
+  assert.ok(app.calls.some(call => call.url.includes('queue=all&office_id=all')));
+  await vm.runInContext("recordsManagement.open('personnel')", app.context);
+  assert.match(app.element('management-list').innerHTML, /&lt;Faculty name&gt;/);
+  assert.equal(app.element('management-add').classList.contains('d-none'), false);
+});
+
+test('other roles cannot open management or request a particulars editor', async () => {
+  for (const role of ['admin', 'ovp_pad', 'sksu_officials']) {
+    const app = page({ token: 'sample', profile: { roles: [role], office_id: 9 } });
+    await flush();
+    const before = app.calls.length;
+    await vm.runInContext("recordsManagement.open('sources'); recordsManagement.handleClick({ preventDefault() {}, target: { closest(selector) { return selector === '[data-edit-document]' ? { dataset: { editDocument: '26-00001', editKind: 'particulars' } } : null; } } });", app.context);
+    await flush();
+    assert.equal(app.calls.length, before);
+    vm.runInContext("changeSection('management')", app.context);
+    assert.equal(app.element('section-management').classList.contains('d-none'), true);
+  }
+});
+
+test('adding personnel requires full profile fields and saves email, position and campus', async () => {
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/management/personnel')) return { body: { data: [] } };
+  } });
+  await flush();
+  await vm.runInContext("recordsManagement.open('personnel')", app.context);
+  app.element('management-add').click();
+  const html = app.element('record-edit-body').innerHTML;
+  for (const field of ['name', 'email', 'position', 'campus']) assert.match(html, new RegExp(`name="${field}"[^>]*required`));
+  assert.match(html, /type="email"/);
+  assert.doesNotMatch(html, /name="(?:acc_type|roles|password)"/);
+  assert.equal(app.element('record-personnel-email').value, '');
+  app.element('record-catalog-name').value = 'New Faculty';
+  app.element('record-personnel-email').value = 'faculty@example.test';
+  app.element('record-personnel-position').value = 'Instructor';
+  app.element('record-personnel-campus').value = 'Isulan';
+  app.element('record-catalog-active').checked = true;
+  app.element('record-edit-reason').value = 'Add full personnel details.';
+  await app.element('record-edit-form').submit({ preventDefault() {} });
+  const saved = app.calls.find(call => call.path.endsWith('/management/personnel') && call.options.method === 'POST');
+  assert.deepEqual(JSON.parse(saved.options.body), { name: 'New Faculty', email: 'faculty@example.test', position: 'Instructor', campus: 'Isulan', is_active: true, reason: 'Add full personnel details.' });
+});
+
+test('personnel listing and editing show all recorded details and search by email or campus', async () => {
+  const row = { id: 5, name: 'Faculty One', email: 'faculty.one@example.test', position: 'Instructor <I>', campus: 'Isulan', is_active: true, version: 'profile-v1' };
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/management/personnel')) return { body: { data: [row] } };
+    if (path.endsWith('/management/sources')) return { body: { data: [{ id: 1, name: 'Sample source', is_active: true, version: 's1' }] } };
+  } });
+  await flush();
+  await vm.runInContext("recordsManagement.open('personnel')", app.context);
+  assert.match(app.element('management-list').innerHTML, /faculty.one@example.test/);
+  assert.match(app.element('management-list').innerHTML, /Instructor &lt;I&gt;/);
+  for (const text of ['faculty.one@example.test', 'Isulan', 'Instructor']) {
+    app.element('management-search').value = text;
+    app.element('management-search').input();
+    assert.match(app.element('management-list').innerHTML, /Faculty One/);
+  }
+  app.element('management-search').value = 'No such email'; app.element('management-search').input();
+  assert.match(app.element('management-list').innerHTML, /No matching entries/);
+  vm.runInContext("recordsManagement.handleClick({ target: { closest(selector) { return selector === '[data-edit-catalog]' ? { dataset: { editCatalog: '5' } } : null; } } });", app.context);
+  const html = app.element('record-edit-body').innerHTML;
+  assert.match(html, /value="faculty.one@example.test"/);
+  assert.match(html, /value="Instructor &lt;I&gt;"/);
+  assert.match(html, /value="Isulan"/);
+  app.element('record-catalog-name').value = row.name;
+  app.element('record-personnel-email').value = 'corrected@example.test';
+  app.element('record-personnel-position').value = 'Professor';
+  app.element('record-personnel-campus').value = 'Tacurong';
+  app.element('record-catalog-active').checked = true;
+  app.element('record-edit-reason').value = 'Correct faculty details.';
+  await app.element('record-edit-form').submit({ preventDefault() {} });
+  const saved = app.calls.find(call => call.path.endsWith('/management/personnel/5') && call.options.method === 'PATCH');
+  assert.deepEqual(JSON.parse(saved.options.body), { name: row.name, email: 'corrected@example.test', position: 'Professor', campus: 'Tacurong', is_active: true, version: 'profile-v1', reason: 'Correct faculty details.' });
+  await vm.runInContext("recordsManagement.open('sources')", app.context);
+  app.element('management-add').click();
+  assert.doesNotMatch(app.element('record-edit-body').innerHTML, /name="(?:email|position|campus)"/);
+});
+
+test('the particulars editor sends only corrected text, version, and reason through the selected module', async () => {
+  class ParticularsForm { constructor() { return new Map([['description', 'Corrected particulars']]); } }
+  const record = { reference_no: '26-00001', description: 'Wrong particulars', subject: 'Wrong particulars', edit_version: 'document-v1', permissions: { edit_particulars: true } };
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records'], office_id: 2 }, formData: ParticularsForm, respond(path, options) {
+    if (path.endsWith('/documents/26-00001')) return { body: { data: record } };
+    if (path.endsWith('/particulars') && options.method === 'PATCH') return { body: { message: 'Saved.' } };
+  } });
+  await flush();
+  vm.runInContext("recordsManagement.handleClick({ preventDefault() {}, target: { closest(selector) { return selector === '[data-edit-document]' ? { dataset: { editDocument: '26-00001', editKind: 'particulars' } } : null; } } });", app.context);
+  await flush();
+  assert.match(app.element('record-edit-body').innerHTML, /name="description"/);
+  assert.doesNotMatch(app.element('record-edit-body').innerHTML, /name="(?:document_type_id|source_division_id|personnel_ids)"/);
+  app.element('record-edit-reason').value = 'Fix the encoded name.';
+  await app.element('record-edit-form').submit({ preventDefault() {} });
+  const saved = app.calls.find(call => call.path.endsWith('/particulars') && call.options.method === 'PATCH');
+  assert.equal(saved.path, '/api/doc_router/documents/26-00001/particulars');
+  assert.deepEqual(JSON.parse(saved.options.body), { version: 'document-v1', reason: 'Fix the encoded name.', description: 'Corrected particulars' });
+});
+
+test('owner detail editor retains historical inactive choices and excludes particulars', async () => {
+  const record = { reference_no: '26-00001', subject: 'Existing title', edit_version: 'v1', document_type_id: 7, document_type: 'TRAVEL ORDER', source_division_id: 8,
+    external_sender: 'Historical source', personnel: [{ id: 9, name: 'Historical faculty' }], travel_details: { destination: 'Campus', travel_type: 'Official Business' }, permissions: { edit_details: true } };
+  const app = page({ token: 'sample', profile: { roles: ['sksu_officials'], office_id: 9 }, respond(path) {
+    if (path.endsWith('/documents/26-00001')) return { body: { data: record } };
+    if (path.endsWith('/registration-options')) return { body: { document_types: [], personnel: [], source_divisions: [] } };
+  } });
+  await flush();
+  vm.runInContext("recordsManagement.handleClick({ preventDefault() {}, target: { closest(selector) { return selector === '[data-edit-document]' ? { dataset: { editDocument: '26-00001', editKind: 'details' } } : null; } } });", app.context);
+  await flush();
+  const html = app.element('record-edit-body').innerHTML;
+  assert.match(html, /Historical faculty/);
+  assert.match(html, /Historical source/);
+  assert.match(html, /TRAVEL ORDER/);
+  assert.doesNotMatch(html, /name="(?:description|subject|reference_no|status)"/);
+});
+
+test('role switching discards an in-flight document editor response', async () => {
+  let resolveRecord;
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records', 'sksu_officials'], office_id: 2 }, activeRole: 'ovp_central_records', respond(path) {
+    if (path.endsWith('/documents/26-00001')) return new Promise(resolve => { resolveRecord = resolve; });
+  } });
+  await flush();
+  vm.runInContext("recordsManagement.handleClick({ preventDefault() {}, target: { closest(selector) { return selector === '[data-edit-document]' ? { dataset: { editDocument: '26-00001', editKind: 'particulars' } } : null; } } });", app.context);
+  await flush();
+  await vm.runInContext('showRolePicker()', app.context);
+  resolveRecord({ body: { data: { subject: 'Late document title', description: 'Late document particulars', permissions: { edit_particulars: true } } } });
+  await flush();
+  assert.equal(app.element('record-edit-modal').visible, false);
+  assert.doesNotMatch(app.element('record-edit-body').innerHTML, /Late document/);
+});
+
+test('document correction history escapes before and after values and preserves the reason', async () => {
+  const app = page({ token: 'sample', profile: { roles: ['ovp_central_records'], office_id: 2 }, respond(path) {
+    if (path.endsWith('/documents/26-00001')) return { body: { data: { reference_no: '26-00001', subject: 'Corrected name', status: 'completed', permissions: { edit_particulars: true }, history: [],
+      changes: [{ action: 'particulars_corrected', created_at: '2026-10-31 01:00:00', actor_name: 'Records Staff', actor_role: 'ovp_central_records', reason: 'Fix <spelling>', before: { description: '<old name>' }, after: { description: '<new name>' } }] } } };
+  } });
+  await flush();
+  await vm.runInContext("openDocument('26-00001')", app.context);
+  const html = app.element('document-detail').innerHTML;
+  assert.match(html, /Correction history/);
+  assert.match(html, /&lt;old name&gt;/);
+  assert.match(html, /&lt;new name&gt;/);
+  assert.match(html, /Fix &lt;spelling&gt;/);
+  assert.match(html, /data-edit-kind="particulars"/);
+  assert.doesNotMatch(html, /data-edit-kind="details"/);
+});
 
 const approvalDocument = {
   reference_no: 'PAD-2026-000777', subject: 'Campus request', document_type: 'Memorandum', status: 'received',
@@ -106,7 +266,7 @@ function page({ token, authorize = true, restore = true, role = 'staff',
   let googleResizeCallback;
   let disabledAutoSelect = 0;
   let currentUrl = '/';
-  const sections = ['dashboard', 'statistics', 'documents', 'track', 'admin'].map((name) => element(`section-${name}`));
+  const sections = ['dashboard', 'statistics', 'documents', 'track', 'admin', 'management'].map((name) => element(`section-${name}`));
   const navigation = ['dashboard', 'statistics', 'documents', 'track', 'admin'].map((name) => {
     const item = element(`nav-${name}`);
     item.dataset.nav = name;

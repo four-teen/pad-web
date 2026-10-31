@@ -490,6 +490,21 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
         : '<div class="journey-empty"><i class="bx bx-history" aria-hidden="true"></i><p>No recorded movements.</p></div>'}</section>`;
   }
 
+  function changeHistory(data) {
+    if (!data.changes?.length) return '';
+    const labels = { subject: 'Document heading', description: 'Particulars', document_type: 'Document type', external_sender: 'Document source', personnel: 'Faculty / personnel', travel_details: 'Travel details' };
+    const travelLabels = { destination: 'Destination', purpose: 'Purpose', order_date: 'Order date', departure_date: 'Departure date', return_date: 'Return date', travel_type: 'Travel type', vehicle_requirement: 'Vehicle requirement', remarks: 'Remarks' };
+    const valueText = (key, value) => {
+      if (key === 'personnel') return (value || []).map((person) => person.name).join('\n') || 'None';
+      if (key === 'travel_details') return value ? Object.entries(value).map(([field, text]) => `${travelLabels[field] || field}: ${text || '—'}`).join('\n') : 'None';
+      return value || '—';
+    };
+    return `<section class="mt-4 mb-4" aria-label="Document correction history"><h5>Correction history</h5>${data.changes.map((change) => {
+      const fields = Object.keys(labels).filter((key) => JSON.stringify(change.before?.[key]) !== JSON.stringify(change.after?.[key]));
+      return `<details class="border rounded p-3 mb-2"><summary>${change.action === 'particulars_corrected' ? 'Particulars corrected' : 'Document details updated'} · ${formatDate(change.created_at)} · ${escapeHtml(change.actor_name)}</summary><p class="small text-muted mt-2">${escapeHtml(change.actor_role?.replaceAll('_', ' ') || '')}</p><p class="routing-remarks"><strong>Reason:</strong> ${escapeHtml(change.reason)}</p><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Field</th><th>Previous value</th><th>New value</th></tr></thead><tbody>${fields.map((key) => `<tr><th>${labels[key]}</th><td class="routing-remarks" style="white-space:pre-wrap">${escapeHtml(valueText(key, change.before[key]))}</td><td class="routing-remarks" style="white-space:pre-wrap">${escapeHtml(valueText(key, change.after[key]))}</td></tr>`).join('') || '<tr><td colspan="3">No field values changed.</td></tr>'}</tbody></table></div></details>`;
+    }).join('')}</section>`;
+  }
+
   async function openDocument(reference) {
     const current = ++detailRequest;
     changeSection('track');
@@ -504,6 +519,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       const asOf = data.server_time || new Date().toISOString();
       const timeline = custodyTimeline(data);
       const buttons = [];
+      if (data.permissions?.edit_particulars) buttons.push(`<button type="button" class="btn btn-outline-primary" data-edit-document="${escapeHtml(data.reference_no)}" data-edit-kind="particulars">Edit particulars</button>`);
+      if (data.permissions?.edit_details) buttons.push(`<button type="button" class="btn btn-outline-primary" data-edit-document="${escapeHtml(data.reference_no)}" data-edit-kind="details">Edit document details</button>`);
       for (const [key, label] of Object.entries({ receive: 'Receive', decide: 'Record decision & return', route: 'Send', return: 'Return', act: 'Act', delete: 'Delete', complete: 'Complete', deliver: 'Record delivery' })) {
         if (data.is_pad_return && !['receive', 'act'].includes(key)) continue;
         if (key === 'act' && !canAct(data)) continue;
@@ -515,7 +532,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
         <details class="journey-overview"><summary><span><i class="bx bx-buildings" aria-hidden="true"></i> Offices & custody details</span>
           <span class="journey-overview-location">${escapeHtml(data.pending_office_id ? `Awaiting receipt at ${data.pending_office_name || 'destination office'}` : data.current_office_name || 'Recorded office')} <i class="bx bx-chevron-down" aria-hidden="true"></i></span></summary>
           <div class="row g-3 journey-offices"><div class="col-md-4"><small class="text-muted d-block">Origin</small>${officeName(sourceName(data), data.source_division_id ? null : data.source_office_campus)}</div><div class="col-md-4"><small class="text-muted d-block">Current holding office</small>${officeName(data.current_office_name, data.current_office_campus)}</div><div class="col-md-4"><small class="text-muted d-block">${data.pending_office_id ? 'Awaiting receipt at' : 'Intended final office'}</small>${officeName(data.pending_office_name || data.recipient_office_name, data.pending_office_campus)}</div></div>
-          ${custodySummary(data, timeline.currentStay, asOf)}</details>${journeyTimeline(data, timeline, asOf)}
+          ${custodySummary(data, timeline.currentStay, asOf)}</details>${journeyTimeline(data, timeline, asOf)}${changeHistory(data)}
         <section class="journey-document-tools" aria-label="Document file and actions"><h6>Document file & actions</h6>${documentFile(data)}
         ${buttons.length ? `<div class="routing-detail-actions mb-4"><div class="btn-group btn-group-sm" role="group" aria-label="Document actions">${buttons.join('')}</div></div>` : `<div class="alert alert-light border small mb-4">${data.pending_office_id ? 'Awaiting receipt by ' + escapeHtml(data.pending_office_name) + '. The destination office confirms receipt.' : ['acted', 'completed', 'delivered'].includes(data.status) ? 'This document is finished. Its full history is recorded in the journey above.' : 'Your office can follow this document through its timeline.'}</div>`}
         <div class="small text-muted mb-3">${documentDate(data)}${senderLabel(data) ? `<div>Sent by: ${escapeHtml(senderLabel(data))}</div>` : ''}</div>

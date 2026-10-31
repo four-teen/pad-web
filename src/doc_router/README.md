@@ -1,6 +1,10 @@
 # Office Document Router
 
+OVP Central Records has a **Management** sidebar with Document Particulars, Faculty / Personnel, and Document Sources. Records can correct particulars across all offices and statuses; other document fields remain unavailable to that role. Originating offices can use **Edit document details** during preparation or after receiving a correction return to update type, source, personnel, and Travel Order fields. Both editors require a change reason and reject stale saves. Document details display the previous/new values in **Correction history**, separately from custody events. Catalogs support adding, renaming and activation/deactivation while preserving historical names. Run `php scripts/setup-records-management.php` in pad-api before using these features on an existing installation; see `pad-api/docs/records-management.md`.
+
 `index.js` provides the uniform office dashboard, queues, document registration, timeline, and movement dialogs.
+
+Personnel management captures full name, email address, position/designation, and campus. All four are required in the add/edit form and searchable in the personnel list. Adding personnel does not approve login access. Existing installations also need `php scripts/setup-personnel-details.php` in pad-api; optionally pass the original PAD configuration path to backfill only missing contact details by legacy ID. Existing document name snapshots are preserved.
 
 The sidebar groups tasks into **Document Preparation** (Register document, My Document), **Receipt & Routing** (Awaiting Receipt, Received, Outgoing, Returned), **Review & Action** (For Approval for PAD; For Action for Central Records), and **Completed & History** (Acted, Delivered / completed, All Timeline). Review & Action is hidden for roles without one of these queues. Central Records uses Awaiting Receipt before confirming a PAD handoff, then For Action. Its redundant Returned from PAD menu/card is removed. Old `pad_results` frontend links open Awaiting Receipt.
 

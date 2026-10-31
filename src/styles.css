@@ -11,6 +11,10 @@
 }
 
 body { background: #f7f8f7; color: var(--ct-ink); }
+#record-edit-form { display: flex; flex-direction: column; max-height: 100%; min-height: 0; overflow: hidden; }
+#record-edit-modal .modal-body { overflow-y: auto; }
+#section-management td { overflow-wrap: anywhere; }
+#section-management td:last-child .d-flex { flex-wrap: wrap; }
 /* Override the theme's pale text consistently across workspaces and dialogs. */
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { color: var(--ct-ink); }
 .text-body { color: var(--ct-ink) !important; }

@@ -2,7 +2,7 @@
 <html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default" data-assets-path="./assets/">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer-when-downgrade" />
     <meta name="description" content="PAD — Presidential Action Desk: Electronic Document Routing, Tracking, and Executive Action System." />
     <meta name="theme-color" content="#0a6b45" />
@@ -20,67 +20,56 @@
     <link rel="stylesheet" href="/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css" />
     <link rel="stylesheet" href="/assets/vendor/libs/select2/select2.min.css" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/login.css" />
+    <link rel="stylesheet" href="/src/admin-overview.css" />
+    <link rel="stylesheet" href="/src/animated-icons.css" />
+    <link rel="stylesheet" href="/src/travel-overview.css" />
     <link rel="stylesheet" href="/src/president/styles.css" />
   </head>
   <body>
-    <main id="auth-view" class="auth-shell">
-      <section class="auth-story" aria-labelledby="auth-story-title">
-        <div class="auth-story-content">
-          <div class="auth-university">
-            <span class="auth-crest" aria-hidden="true"><i class="bx bx-buildings"></i></span>
-            <span>Sultan Kudarat State University</span>
-          </div>
-          <div class="auth-story-copy">
-            <p class="auth-kicker">PAD · PRESIDENTIAL ACTION DESK</p>
-            <h1 id="auth-story-title">Electronic Document Routing, Tracking, and <span>Executive Action System.</span></h1>
-            <p>PAD keeps official documents moving from receipt to executive action, signature, and release with a complete record at every handoff.</p>
-          </div>
-          <div class="auth-flow" aria-label="Document routing flow">
-            <div class="auth-flow-step">
-              <span class="auth-flow-icon"><i class="bx bx-inbox"></i></span>
-              <span><strong>Receive</strong><small>Records Office</small></span>
-            </div>
-            <i class="bx bx-right-arrow-alt auth-flow-arrow" aria-hidden="true"></i>
-            <div class="auth-flow-step">
-              <span class="auth-flow-icon"><i class="bx bx-pen"></i></span>
-              <span><strong>Action</strong><small>Presidential Desk</small></span>
-            </div>
-            <i class="bx bx-right-arrow-alt auth-flow-arrow" aria-hidden="true"></i>
-            <div class="auth-flow-step">
-              <span class="auth-flow-icon"><i class="bx bx-send"></i></span>
-              <span><strong>Release</strong><small>Owner Office</small></span>
-            </div>
-          </div>
-        </div>
-        <p class="auth-story-footer"><i class="bx bx-shield-quarter"></i> Secure, accountable, and traceable.<small class="auth-story-credit">antonioE, apellidoE, copyright 2026</small></p>
-      </section>
+    <main id="auth-view" class="auth-shell" aria-label="PAD university portal">
+      <div id="auth-gateway" class="auth-gateway">
+        <header class="auth-identity">
+          <h1 id="auth-title" class="auth-wordmark"><span class="auth-wordmark-wide">P</span><span class="auth-wordmark-accent">A</span><span class="auth-wordmark-wide">D</span></h1>
+          <p class="auth-identity-name">Presidential Action Desk</p>
+          <p class="auth-identity-description">Electronic Document Routing, Tracking, and Executive Action System</p>
+        </header>
 
-      <section class="auth-access" aria-label="PAD sign in">
-        <div class="auth-card card">
-          <div class="auth-mobile-brand">
-            <span class="auth-mark" aria-hidden="true"><i class="bx bx-transfer-alt"></i></span>
-            <span class="brand-copy"><strong>PAD</strong><small>Presidential Action Desk</small></span>
-          </div>
-          <p class="eyebrow">SECURE STAFF ACCESS</p>
-          <h1>Welcome to PAD</h1>
-          <p class="auth-system-name">Presidential Action Desk</p>
-          <p class="auth-copy">Electronic Document Routing, Tracking, and Executive Action System. Sign in with your authorized university Google account to continue.</p>
-          <div class="auth-signin-panel">
-            <div id="google-signin" class="google-signin" aria-live="polite">
-              <button id="google-signin-placeholder" class="google-button-placeholder" type="button" disabled>
-                <span class="google-letter" aria-hidden="true">G</span>
-                Continue with Google
+        <div class="auth-stage">
+          <div class="auth-seal-stage">
+            <div class="auth-seal-aura" aria-hidden="true"></div>
+            <div class="auth-seal-reveal">
+              <button id="auth-seal-button" class="auth-seal-button" type="button"
+                aria-label="Open sign-in panel" aria-expanded="false" aria-controls="auth-access">
+                <img class="auth-seal" src="/assets/img/branding/sksu-seal.webp"
+                  alt="Sultan Kudarat State University seal" width="216" height="216" fetchpriority="high" />
               </button>
             </div>
-            <p id="auth-status" class="auth-status">Preparing secure Google sign-in...</p>
           </div>
-          <div class="auth-access-note">
-            <i class="bx bx-lock-alt" aria-hidden="true"></i>
-            <span>Access is limited to email addresses approved by the Records Office.</span>
-          </div>
-          <p class="auth-help">Having trouble signing in? Contact the Records Office for access.</p>
+          <p class="auth-entry-hint">Select the seal to sign in</p>
+
+          <section id="auth-access" class="auth-access" aria-labelledby="auth-access-title" tabindex="-1" inert>
+            <h2 id="auth-access-title">Sign in to your workspace</h2>
+            <div id="google-signin" class="google-signin">
+              <button id="google-signin-placeholder" class="google-button-placeholder" type="button" disabled>
+                <span class="google-letter" aria-hidden="true">G</span>Continue with Google
+              </button>
+            </div>
+            <p id="auth-status" class="auth-status" role="status" aria-live="polite" aria-atomic="true">Preparing secure Google sign-in...</p>
+            <div class="auth-access-actions">
+              <span><i class="bx bx-lock-alt" aria-hidden="true"></i> Authorized staff access</span>
+              <button id="auth-cancel" class="auth-quiet-button" type="button">Cancel</button>
+            </div>
+          </section>
         </div>
-      </section>
+
+        <noscript><p class="auth-noscript">Please enable JavaScript to sign in to PAD.</p></noscript>
+        <footer class="auth-footer">
+          <span>Sultan Kudarat State University</span>
+          <span>Secure, accountable, and traceable.</span>
+          <small>antonioE, apellidoE, copyright 2026</small>
+        </footer>
+      </div>
     </main>
 
     <main id="role-view" class="role-shell d-none">
@@ -136,30 +125,35 @@
             <li class="menu-item" data-nav="statistics">
               <a href="#doc_router/statistics" class="menu-link" data-section="statistics"><i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i><div>Document Statistics</div></a>
             </li>
-            <li class="menu-header small text-uppercase"><span class="menu-header-text">Document Preparation</span></li>
-            <li id="register-document-nav-item" class="menu-item">
+            <li data-office-routing-only class="menu-header small text-uppercase"><span class="menu-header-text">Document Preparation</span></li>
+            <li data-office-routing-only id="register-document-nav-item" class="menu-item">
               <button class="menu-link border-0 bg-transparent w-100 text-start" id="new-document-button" type="button"><i class="menu-icon tf-icons bx bx-plus-circle"></i><div>Register document</div></button>
             </li>
-            <li class="menu-item" data-routing-queue="my_documents"><a href="#routing/my_documents" class="menu-link"><i class="menu-icon tf-icons bx bx-file"></i><div>My Document</div><span class="routing-nav-count badge bg-label-primary ms-auto" data-queue-count="my_documents">0</span></a></li>
-            <li class="menu-header small text-uppercase"><span class="menu-header-text">Receipt &amp; Routing</span></li>
-            <li class="menu-item" data-routing-queue="incoming"><a href="#routing/incoming" class="menu-link"><i class="menu-icon tf-icons bx bx-download"></i><div>Awaiting Receipt</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="incoming">0</span></a></li>
-            <li class="menu-item" data-routing-queue="received"><a href="#routing/received" class="menu-link"><i class="menu-icon tf-icons bx bx-check-circle"></i><div>Received</div><span class="routing-nav-count badge bg-label-success ms-auto" data-queue-count="received">0</span></a></li>
-            <li class="menu-item" data-routing-queue="outgoing"><a href="#routing/outgoing" class="menu-link"><i class="menu-icon tf-icons bx bx-send"></i><div>Outgoing</div><span class="routing-nav-count badge bg-label-primary ms-auto" data-queue-count="outgoing">0</span></a></li>
-            <li class="menu-item" data-routing-queue="returned"><a href="#routing/returned" class="menu-link"><i class="menu-icon tf-icons bx bx-undo"></i><div>Returned</div><span class="routing-nav-count badge bg-label-danger ms-auto" data-queue-count="returned">0</span></a></li>
-            <li id="routing-review-nav-group" class="menu-header small text-uppercase d-none"><span class="menu-header-text">Review &amp; Action</span></li>
-            <li class="menu-item d-none" data-routing-queue="for_approval"><a href="#routing/for_approval" class="menu-link"><i class="menu-icon tf-icons bx bx-edit-alt"></i><div>For Approval</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="for_approval">0</span></a></li>
-            <li class="menu-item d-none" data-routing-queue="for_action"><a href="#routing/for_action" class="menu-link"><i class="menu-icon tf-icons bx bx-task"></i><div>For Action</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="for_action">0</span></a></li>
-            <li class="menu-header small text-uppercase"><span class="menu-header-text">Completed &amp; History</span></li>
-            <li class="menu-item" data-routing-queue="acted"><a href="#routing/acted" class="menu-link"><i class="menu-icon tf-icons bx bx-task"></i><div>Acted</div><span class="routing-nav-count badge bg-label-info ms-auto" data-queue-count="acted">0</span></a></li>
-            <li class="menu-item" data-routing-queue="delivered"><a href="#routing/delivered" class="menu-link"><i class="menu-icon tf-icons bx bx-check-shield"></i><div>Delivered / completed</div><span class="routing-nav-count badge bg-label-success ms-auto" data-queue-count="delivered">0</span></a></li>
-            <li class="menu-item" data-routing-queue="all"><a href="#routing/all" class="menu-link"><i class="menu-icon tf-icons bx bx-history"></i><div>All Timeline</div><span class="routing-nav-count badge bg-label-secondary ms-auto" data-queue-count="all">0</span></a></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="my_documents"><a href="#routing/my_documents" class="menu-link"><i class="menu-icon tf-icons bx bx-file"></i><div>My Document</div><span class="routing-nav-count badge bg-label-primary ms-auto" data-queue-count="my_documents">0</span></a></li>
+            <li data-office-routing-only class="menu-header small text-uppercase"><span class="menu-header-text">Receipt &amp; Routing</span></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="incoming"><a href="#routing/incoming" class="menu-link"><i class="menu-icon tf-icons bx bx-download"></i><div>Awaiting Receipt</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="incoming">0</span></a></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="received"><a href="#routing/received" class="menu-link"><i class="menu-icon tf-icons bx bx-check-circle"></i><div>Received</div><span class="routing-nav-count badge bg-label-success ms-auto" data-queue-count="received">0</span></a></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="outgoing"><a href="#routing/outgoing" class="menu-link"><i class="menu-icon tf-icons bx bx-send"></i><div>Outgoing</div><span class="routing-nav-count badge bg-label-primary ms-auto" data-queue-count="outgoing">0</span></a></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="returned"><a href="#routing/returned" class="menu-link"><i class="menu-icon tf-icons bx bx-undo"></i><div>Returned</div><span class="routing-nav-count badge bg-label-danger ms-auto" data-queue-count="returned">0</span></a></li>
+            <li data-office-routing-only id="routing-review-nav-group" class="menu-header small text-uppercase d-none"><span class="menu-header-text">Review &amp; Action</span></li>
+            <li data-office-routing-only class="menu-item d-none" data-routing-queue="for_approval"><a href="#routing/for_approval" class="menu-link"><i class="menu-icon tf-icons bx bx-edit-alt"></i><div>For Approval</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="for_approval">0</span></a></li>
+            <li data-office-routing-only class="menu-item d-none" data-routing-queue="for_action"><a href="#routing/for_action" class="menu-link"><i class="menu-icon tf-icons bx bx-task"></i><div>For Action</div><span class="routing-nav-count badge bg-label-warning ms-auto" data-queue-count="for_action">0</span></a></li>
+            <li data-office-routing-only class="menu-header small text-uppercase"><span class="menu-header-text">Completed &amp; History</span></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="acted"><a href="#routing/acted" class="menu-link"><i class="menu-icon tf-icons bx bx-task"></i><div>Acted</div><span class="routing-nav-count badge bg-label-info ms-auto" data-queue-count="acted">0</span></a></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="delivered"><a href="#routing/delivered" class="menu-link"><i class="menu-icon tf-icons bx bx-check-shield"></i><div>Delivered / completed</div><span class="routing-nav-count badge bg-label-success ms-auto" data-queue-count="delivered">0</span></a></li>
+            <li data-office-routing-only class="menu-item" data-routing-queue="all"><a href="#routing/all" class="menu-link"><i class="menu-icon tf-icons bx bx-history"></i><div>All Timeline</div><span class="routing-nav-count badge bg-label-secondary ms-auto" data-queue-count="all">0</span></a></li>
+            <li id="admin-document-types-nav" class="d-none" data-admin-only>
+              <div class="admin-document-types-heading"><span>Document types</span><small>All time</small></div>
+              <ul id="admin-document-types-list" class="admin-document-types-list" aria-label="Document types and all-time counts"><li class="admin-document-types-message">Loading document types...</li></ul>
+            </li>
             <li class="menu-header small text-uppercase d-none" data-records-management-only><span class="menu-header-text">Management</span></li>
             <li class="menu-item d-none" data-records-management-only data-management-nav="documents"><a href="#doc_router/management/documents" class="menu-link"><i class="menu-icon tf-icons bx bx-edit-alt"></i><div>Document Particulars</div></a></li>
             <li class="menu-item d-none" data-records-management-only data-management-nav="personnel"><a href="#doc_router/management/personnel" class="menu-link"><i class="menu-icon tf-icons bx bx-group"></i><div>Faculty / Personnel</div></a></li>
             <li class="menu-item d-none" data-records-management-only data-management-nav="sources"><a href="#doc_router/management/sources" class="menu-link"><i class="menu-icon tf-icons bx bx-buildings"></i><div>Document Sources</div></a></li>
             <li id="admin-nav-group" class="menu-header small text-uppercase d-none"><span class="menu-header-text">Administration</span></li>
+            <li class="menu-item d-none" data-admin-nav="overview" data-admin-only><a href="#admin" class="menu-link"><i class="menu-icon tf-icons bx bx-grid-alt"></i><div>Admin overview</div></a></li>
             <li id="admin-nav-item" class="menu-item d-none" data-admin-nav="accounts" data-admin-only>
-              <a href="#admin" class="menu-link"><i class="menu-icon tf-icons bx bx-user"></i><div>User accounts</div></a>
+              <a href="#admin/accounts" class="menu-link"><i class="menu-icon tf-icons bx bx-user"></i><div>User accounts</div></a>
             </li>
             <li class="menu-item d-none" data-admin-nav="offices" data-admin-only>
               <a href="#admin/offices" class="menu-link"><i class="menu-icon tf-icons bx bx-buildings"></i><div>Routing offices</div></a>
@@ -174,7 +168,7 @@
               <a href="#admin/database" class="menu-link"><i class="menu-icon tf-icons bx bx-data"></i><div>Database management</div></a>
             </li>
           </ul>
-          <div class="menu-footer px-3 pb-3"><span class="badge bg-label-success">Executive action system</span></div>
+          <div class="menu-footer px-3 pb-3"><span class="badge bg-label-success">Executive action system</span><a class="animated-icons-credit" href="https://lordicon.com/" target="_blank" rel="noopener noreferrer">Animated icons by Lordicon.com</a></div>
         </aside>
 
         <div class="layout-page">
@@ -236,8 +230,9 @@
 
               <section id="section-documents" class="app-section d-none">
                 <div class="routing-context mb-4"><div><span class="routing-context-icon"><i class="bx bx-buildings"></i></span><strong id="routing-office-name">Your office</strong><span id="routing-office-campus" class="badge bg-label-success ms-2"></span></div><div id="routing-monitor-wrap" class="d-none"><label for="routing-office-filter" class="small text-muted">Timeline monitoring scope</label><select id="routing-office-filter" class="form-select form-select-sm"><option value="all">All offices</option></select></div></div>
-                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4"><div><p class="eyebrow mb-1">OFFICE DOCUMENT ROUTING</p><h4 id="routing-queue-title" class="fw-bold mb-1">All Timeline</h4><p id="routing-queue-description" class="mb-0 text-muted">Documents created or sent by your office, with their complete routing history.</p><small id="routing-queue-office" class="d-block text-primary mt-2"></small></div><button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-plus me-1"></i> Register document</button></div>
-                <div class="card"><div class="card-header"><div class="row g-3"><div class="col-md-8"><label class="visually-hidden" for="document-search">Search documents</label><div class="input-group input-group-merge"><span class="input-group-text"><i class="bx bx-search"></i></span><input id="document-search" class="form-control" type="search" placeholder="Search document number, particulars, type, or office" /></div></div><div class="col-md-4"><label class="visually-hidden" for="status-filter">Filter status</label><select id="status-filter" class="form-select"><option value="">All statuses</option><option value="created">My Document</option><option value="in_transit">Awaiting receipt</option><option value="received">Receipt confirmed</option><option value="acted">Acted</option><option value="completed">Completed</option><option value="delivered">Delivered</option></select></div></div></div><div id="document-table-wrap" class="table-responsive"><table class="table table-hover align-middle routing-table"><thead><tr id="document-table-head"><th>File code / date</th><th>Particular</th><th>Current location / destination</th><th>Status</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="document-list"><tr><td colspan="5" class="text-center text-muted py-5">Loading documents…</td></tr></tbody></table></div><div id="received-card-list" class="routing-received-list d-none" aria-live="polite"></div><div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2"><small id="routing-document-count" class="text-muted"></small><div class="btn-group" role="group" aria-label="Document pages"><button id="routing-prev" class="btn btn-sm btn-outline-secondary" type="button" data-routing-page="-1">Previous</button><button id="routing-next" class="btn btn-sm btn-outline-secondary" type="button" data-routing-page="1">Next</button></div></div></div>
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4"><div><p id="routing-view-kicker" class="eyebrow mb-1">OFFICE DOCUMENT ROUTING</p><h4 id="routing-queue-title" tabindex="-1" class="fw-bold mb-1">All Timeline</h4><p id="routing-queue-description" class="mb-0 text-muted">Documents created or sent by your office, with their complete routing history.</p><small id="routing-queue-office" class="d-block text-primary mt-2"></small></div><button type="button" class="btn btn-primary" data-open-upload><i class="bx bx-plus me-1"></i> Register document</button></div>
+                <section id="travel-overview" class="travel-overview d-none" aria-label="Travel schedule overview"><div class="travel-overview-caption"><span><i class="bx bx-calendar" aria-hidden="true"></i> Travel schedule</span><span id="travel-summary-date"></span></div><div id="travel-summary-cards" class="travel-summary-grid"></div><p id="travel-summary-note" class="travel-summary-note"></p><h2 id="travel-list-heading" class="travel-list-heading">On travel</h2></section>
+                <div class="card"><div class="card-header"><div class="row g-3"><div class="col-md-8"><label class="visually-hidden" for="document-search">Search documents</label><div class="input-group input-group-merge"><span class="input-group-text"><i class="bx bx-search"></i></span><input id="document-search" class="form-control" type="search" placeholder="Search document number, particulars, type, or office" /></div></div><div class="col-md-4"><label class="visually-hidden" for="status-filter">Filter status</label><select id="status-filter" class="form-select"><option value="">All statuses</option><option value="created">My Document</option><option value="in_transit">Awaiting receipt</option><option value="received">Receipt confirmed</option><option value="acted">Acted</option><option value="completed">Completed</option><option value="delivered">Delivered</option></select></div></div></div><div id="document-table-wrap" class="table-responsive"><table class="table table-hover align-middle routing-table"><thead><tr id="document-table-head"><th>File code / date</th><th>Particular</th><th>Current location / destination</th><th>Status</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="document-list"><tr><td colspan="5" class="text-center text-muted py-5">Loading documents…</td></tr></tbody></table></div><div id="travel-records-list" class="travel-records-list d-none" aria-live="polite"></div><div id="received-card-list" class="routing-received-list d-none" aria-live="polite"></div><div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2"><small id="routing-document-count" class="text-muted"></small><div class="btn-group" role="group" aria-label="Document pages"><button id="routing-prev" class="btn btn-sm btn-outline-secondary" type="button" data-routing-page="-1">Previous</button><button id="routing-next" class="btn btn-sm btn-outline-secondary" type="button" data-routing-page="1">Next</button></div></div></div>
               </section>
 
               <section id="section-track" class="app-section d-none">
@@ -252,14 +247,29 @@
               </section>
 
               <section id="section-admin" class="app-section d-none">
-                <div class="mb-4">
-                  <div><p class="eyebrow mb-1">SYSTEM CONTROL</p><h4 class="fw-bold mb-1">Administration</h4><p class="mb-0 text-muted">Manage account access, routing offices, officials, document file codes, and administrative database operations.</p></div>
-                </div>
-                <div class="row g-4 mb-4">
-                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon success"><i class="bx bx-user"></i></span><p class="mb-1 text-muted">Approved accounts</p><h3 id="admin-users-total" class="mb-0">-</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon forest"><i class="bx bx-user-check"></i></span><p class="mb-1 text-muted">Active accounts</p><h3 id="admin-users-active" class="mb-0">-</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon orange"><i class="bx bx-buildings"></i></span><p class="mb-1 text-muted">Routing offices</p><h3 id="admin-offices-total" class="mb-0">-</h3></div></div></div>
-                  <div class="col-sm-6 col-xl-3"><div class="card admin-stat"><div class="card-body"><span class="metric-icon muted"><i class="bx bx-folder"></i></span><p class="mb-1 text-muted">Tracked documents</p><h3 id="admin-documents-total" class="mb-0">-</h3></div></div></div>
+                <div class="admin-page-heading"><div><p class="eyebrow">UNIVERSITY ADMINISTRATION</p><h1 id="admin-page-title">Administrator overview</h1><p id="admin-page-description">Account access, office coverage, and the records behind your university.</p></div><button id="admin-overview-refresh" type="button" class="btn btn-outline-primary"><i class="bx bx-refresh me-1" aria-hidden="true"></i> Refresh</button></div>
+                <nav class="admin-page-nav" aria-label="Administration pages">
+                  <button type="button" data-admin-nav="overview">Overview</button><button type="button" data-admin-nav="accounts">Accounts</button><button type="button" data-admin-nav="offices">Offices</button><button type="button" data-admin-nav="officials">Officials</button><button type="button" data-admin-nav="file-codes">File codes</button><button type="button" data-admin-nav="database">Database</button>
+                </nav>
+                <div id="admin-overview-panel">
+                  <div class="admin-snapshot-line"><span><i class="bx bx-time-five" aria-hidden="true"></i> <span id="admin-overview-status" role="status">Loading administration data...</span></span><span>Current access settings · All-time document total</span></div>
+                  <div id="admin-overview-content" aria-busy="true">
+                    <div class="admin-kpi-grid">
+                      <button type="button" class="admin-kpi tone-green" data-admin-insight="all"><span class="admin-kpi-top"><span class="admin-kpi-icon"><i class="bx bx-group" aria-hidden="true"></i></span><i class="bx bx-up-arrow-alt" aria-hidden="true"></i></span><span class="admin-kpi-label">Approved accounts</span><strong id="admin-users-total" class="admin-kpi-number">—</strong><span id="admin-accounts-detail" class="admin-kpi-detail">Loading...</span></button>
+                      <button type="button" class="admin-kpi tone-sage" data-admin-insight="active"><span class="admin-kpi-top"><span class="admin-kpi-icon"><i class="bx bx-user-check" aria-hidden="true"></i></span><i class="bx bx-up-arrow-alt" aria-hidden="true"></i></span><span class="admin-kpi-label">Enabled accounts</span><strong id="admin-users-active" class="admin-kpi-number">—</strong><span id="admin-active-detail" class="admin-kpi-detail">Loading...</span></button>
+                      <button type="button" class="admin-kpi tone-orange" data-admin-insight="active-offices"><span class="admin-kpi-top"><span class="admin-kpi-icon"><i class="bx bx-buildings" aria-hidden="true"></i></span><i class="bx bx-up-arrow-alt" aria-hidden="true"></i></span><span class="admin-kpi-label">Active offices</span><strong id="admin-offices-total" class="admin-kpi-number">—</strong><span id="admin-offices-detail" class="admin-kpi-detail">Loading...</span></button>
+                      <button type="button" class="admin-kpi tone-cream" data-section="statistics"><span class="admin-kpi-top"><span class="admin-kpi-icon"><i class="bx bx-folder-open" aria-hidden="true"></i></span><i class="bx bx-up-arrow-alt" aria-hidden="true"></i></span><span class="admin-kpi-label">Tracked documents</span><strong id="admin-documents-total" class="admin-kpi-number">—</strong><span id="admin-documents-detail" class="admin-kpi-detail">Loading...</span></button>
+                    </div>
+                    <div class="admin-overview-grid">
+                      <section class="admin-overview-card admin-attention-card" aria-labelledby="admin-attention-title"><div class="admin-card-heading"><div><p class="admin-section-label">START HERE</p><h2 id="admin-attention-title">Needs attention</h2></div><span id="admin-attention-count" class="admin-small-badge">Checking setup</span></div><div id="admin-attention-list"><p class="admin-empty">Loading setup checks...</p></div><p class="admin-card-note">Review checks individually; an account or office can appear in more than one.</p></section>
+                      <section class="admin-overview-card" aria-labelledby="admin-access-title"><div class="admin-card-heading"><div><p class="admin-section-label">ACCOUNT ADOPTION</p><h2 id="admin-access-title">Access &amp; first sign-in</h2></div><button type="button" class="admin-text-action" data-admin-insight="awaiting">Review <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button></div><div class="admin-access-body"><div id="admin-access-chart" class="admin-access-chart is-empty" role="img" aria-label="Account access breakdown, detailed in the adjacent legend"><div><strong id="admin-access-percent">—</strong><span>enabled &amp;<br>signed in before</span></div></div><div id="admin-access-legend" class="admin-access-legend"></div></div><p id="admin-signins-week" class="admin-card-note">Sign-in dates reflect each account's latest recorded login.</p><p class="admin-card-footnote">Enabled means access is allowed; it does not indicate who is online.</p></section>
+                      <section class="admin-overview-card" aria-labelledby="admin-campus-title"><div class="admin-card-heading"><div><p class="admin-section-label">OFFICE NETWORK</p><h2 id="admin-campus-title">Coverage by campus</h2></div><button type="button" class="admin-text-action" data-admin-nav="offices">Directory <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button></div><p id="admin-campus-summary" class="admin-card-subtitle">Loading active office coverage...</p><div id="admin-campus-list"></div><p class="admin-card-note">Coverage means at least one enabled account is assigned to the active office.</p></section>
+                      <section class="admin-overview-card" aria-labelledby="admin-roles-title"><div class="admin-card-heading"><div><p class="admin-section-label">PERMISSIONS</p><h2 id="admin-roles-title">Role assignments</h2></div><i class="bx bx-shield-quarter admin-heading-icon" aria-hidden="true"></i></div><div id="admin-role-list"></div><p class="admin-card-note">Accounts may hold multiple roles, so assignment totals can exceed the account count.</p></section>
+                      <section class="admin-overview-card admin-recent-card" aria-labelledby="admin-recent-title"><div class="admin-card-heading"><div><p class="admin-section-label">LATEST ACCOUNT ACTIVITY</p><h2 id="admin-recent-title">Most recent sign-ins</h2></div><button type="button" class="admin-text-action" data-admin-nav="accounts">All accounts <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button></div><p class="admin-card-subtitle">Latest sign-in per account · Asia/Manila time</p><div id="admin-recent-list"></div></section>
+                    </div>
+                    <div class="admin-quick-grid"><button type="button" data-admin-nav="accounts"><i class="bx bx-user-plus" aria-hidden="true"></i><span><strong>Account access</strong><small>Approve users and assign roles</small></span><i class="bx bx-chevron-right" aria-hidden="true"></i></button><button type="button" data-admin-nav="officials"><i class="bx bx-id-card" aria-hidden="true"></i><span><strong>Official directory</strong><small>Keep office contacts current</small></span><i class="bx bx-chevron-right" aria-hidden="true"></i></button><button type="button" data-admin-nav="file-codes"><i class="bx bx-hash" aria-hidden="true"></i><span><strong>File code settings</strong><small>Review annual number series</small></span><i class="bx bx-chevron-right" aria-hidden="true"></i></button></div>
+                  </div>
+                  <div class="admin-overview-footer"><span>Based on approved accounts and the routing office directory.</span></div>
                 </div>
                 <div id="admin-file-codes-panel" class="d-none">
                   <div class="card mb-4">
@@ -286,10 +296,10 @@
                   <div class="card mb-4"><div class="card-header"><h5 class="mb-1">Tables &amp; record counts</h5><small class="text-muted">Linked references must be resolved before clearing a parent table. Empty and protected tables have no clear action.</small></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Table</th><th class="text-end">Records</th><th>Availability / affected content</th><th class="text-end">Operation</th></tr></thead><tbody id="database-tables"><tr><td colspan="4" class="text-center text-muted py-4">Loading table counts…</td></tr></tbody></table></div></div>
                   <div class="card"><div class="card-header"><h5 class="mb-1">Recent clear operations</h5><small class="text-muted">Administrator, reason, affected counts, and recovery backup · latest 20 operations</small></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Date</th><th>Administrator</th><th>Affected content</th><th>Reason</th><th>Backup</th></tr></thead><tbody id="database-events"><tr><td colspan="5" class="text-center text-muted py-4">No operations loaded.</td></tr></tbody></table></div></div>
                 </div>
-                <div id="admin-accounts-panel" class="card">
+                <div id="admin-accounts-panel" class="card d-none">
                   <div class="card-header">
                     <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Account management</h5><small class="text-muted">Approve a Google email, assign one or more roles and any required office, or disable PAD access.</small></div><button id="admin-add-account" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add account</button></div>
-                    <div class="row g-2"><div class="col-md-8"><label class="visually-hidden" for="admin-account-search">Search accounts</label><input id="admin-account-search" type="search" class="form-control" placeholder="Search name, email, role, or office" /></div><div class="col-md-4"><label class="visually-hidden" for="admin-account-status">Filter account status</label><select id="admin-account-status" class="form-select"><option value="">All accounts</option><option value="active">Active</option><option value="disabled">Disabled</option><option value="pending">Not signed in yet</option></select></div></div>
+                    <div class="row g-2"><div class="col-md-8"><label class="visually-hidden" for="admin-account-search">Search accounts</label><input id="admin-account-search" type="search" class="form-control" placeholder="Search name, email, role, or office" /></div><div class="col-md-4"><label class="visually-hidden" for="admin-account-status">Filter account status</label><select id="admin-account-status" class="form-select"><option value="">All accounts</option><option value="active">Active</option><option value="disabled">Disabled</option><option value="pending">Not signed in yet</option><option value="awaiting">Enabled, awaiting first sign-in</option><option value="assignment">Needs office setup</option></select></div></div>
                   </div>
                   <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Account name / email</th><th>Roles</th><th>Role offices</th><th>Access</th><th>Last sign-in</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="admin-users-list"></tbody></table></div>
                   <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-account-count" class="text-muted"></small><div class="btn-group"><button id="admin-account-prev" class="btn btn-sm btn-outline-secondary" type="button" data-account-page="-1">Previous</button><button id="admin-account-next" class="btn btn-sm btn-outline-secondary" type="button" data-account-page="1">Next</button></div></div>
@@ -297,7 +307,7 @@
                 <div id="admin-offices-panel" class="card d-none">
                   <div class="card-header">
                     <div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="mb-1">Routing office management</h5><small class="text-muted">Manage the offices that receive routed documents and their official contacts.</small></div><button id="admin-add-office" type="button" class="btn btn-primary"><i class="bx bx-plus me-1"></i> Add office</button></div>
-                    <div class="row g-2"><div class="col-md-6"><label class="visually-hidden" for="admin-office-search">Search offices and officials</label><input id="admin-office-search" type="search" class="form-control" placeholder="Search office, official, position, or email" /></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-campus-filter">Filter campus</label><select id="admin-office-campus-filter" class="form-select"><option value="">All campuses</option></select></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-status">Filter routing status</label><select id="admin-office-status" class="form-select"><option value="">All offices</option><option value="1">Active for routing</option><option value="0">Inactive</option></select></div></div>
+                    <div class="row g-2"><div class="col-md-6"><label class="visually-hidden" for="admin-office-search">Search offices and officials</label><input id="admin-office-search" type="search" class="form-control" placeholder="Search office, official, position, or email" /></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-campus-filter">Filter campus</label><select id="admin-office-campus-filter" class="form-select"><option value="">All campuses</option></select></div><div class="col-md-3"><label class="visually-hidden" for="admin-office-status">Filter routing status</label><select id="admin-office-status" class="form-select"><option value="">All offices</option><option value="1">Active for routing</option><option value="0">Inactive</option></select></div><div class="col-12"><label class="visually-hidden" for="admin-office-coverage">Filter office setup</label><select id="admin-office-coverage" class="form-select"><option value="">All setup checks</option><option value="uncovered">Active receiving offices without enabled accounts</option><option value="officials">Active offices missing officials</option></select></div></div>
                   </div>
                   <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Routing office</th><th>Campus / domain</th><th>Key officials and contacts</th><th>Routing</th><th class="admin-actions-column">Actions</th></tr></thead><tbody id="admin-offices-list"></tbody></table></div>
                   <div class="card-footer d-flex justify-content-between align-items-center gap-2"><small id="admin-office-count" class="text-muted"></small><div class="btn-group"><button id="admin-office-prev" class="btn btn-sm btn-outline-secondary" type="button" data-office-page="-1">Previous</button><button id="admin-office-next" class="btn btn-sm btn-outline-secondary" type="button" data-office-page="1">Next</button></div></div>
@@ -458,6 +468,7 @@
     <script src="/assets/vendor/js/menu.js"></script>
     <script src="/assets/js/main.js"></script>
     <script type="module" src="/src/app.js"></script>
+    <script type="module" src="/src/animated-icons.js"></script>
     <div class="modal fade" id="database-clear-modal" tabindex="-1" aria-labelledby="database-clear-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><form id="database-clear-form">
         <div class="modal-header"><h5 id="database-clear-title" class="modal-title">Review table-clear operation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>

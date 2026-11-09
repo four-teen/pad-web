@@ -56,16 +56,42 @@ The uniform office module lives in `src/doc_router` and opens at `#doc_router`. 
 
 ## Office Document Routing
 
-Administrator **Database management** opens from the Overview card or Administration sidebar at `#admin/database`. It lists table counts, explains blocked dependencies, and reviews all affected rows before clearing. A reason, exact typed confirmation, and acknowledgement are required. Each successful clear has a recovery backup and audit entry; restoration is a separate database operation. Login/access tables and document-number counters are protected. Run `php scripts/setup-database-maintenance.php` in `pad-api` on an existing installation. See [Database maintenance](../pad-api/docs/database-maintenance.md).
+Administrator **Database management** opens from the Administration tabs or sidebar at `#admin/database`. It lists table counts, explains blocked dependencies, and reviews all affected rows before clearing. A reason, exact typed confirmation, and acknowledgement are required. Each successful clear has a recovery backup and audit entry; restoration is a separate database operation. Login/access tables and document-number counters are protected. Run `php scripts/setup-database-maintenance.php` in `pad-api` on an existing installation. See [Database maintenance](../pad-api/docs/database-maintenance.md).
 
 Open Overview (`#dashboard`) for the office dashboard. Use the sidebar for Incoming, Received, Outgoing, Returned, Acted, Delivered / completed, and All Timeline (`#routing/all`). Each queue shows real counts, search and status filters, pagination, and centered action button groups in the rightmost column. Open a document to see its current holder, pending receiving office, attachment, and full timeline.
 
 Register document assigns the official number after a successful save. The form includes the document source, type, and Description / registration remarks; the description supplies the list heading when no subject is provided. Upload a signed file from the document view later, even after completion. Run `php scripts/setup-document-files.php` in `pad-api` for an existing database. Faculty / personnel involved uses a locally bundled Select2 search with multiple selection; Travel Order requires at least one traveler. Sending requires a destination; receiving explicitly confirms office receipt. Return, action taken, and delivery dialogs collect the required remarks. Ordinary accounts operate for their assigned office. Administrators and Records can choose a monitoring scope from Overview while actions remain tied to their own assigned office.
 
-For an existing API database, run `php scripts/setup-office-routing.php` in `pad-api` before serving this build. Rebuild the frontend with `npm run build` after changing source files. `node tests/admin-preview-server.js` provides an isolated browser preview at `http://localhost:5184/#dashboard` using sample data held in memory.
+For an existing API database, run `php scripts/setup-office-routing.php` in `pad-api` before serving this build. Rebuild the frontend with `npm run build` after changing source files. `node tests/admin-preview-server.js` provides an isolated browser preview at `http://localhost:5184/#admin` using sample data held in memory.
 
 Document source lists the office / agency names imported from `sam.pad.tbldivisions`. It uses one dropdown with search inside it and no separate search box or My office option. Select the document's originating office / agency; your assigned office remains responsible for registration and routing.
 
 ## Optional development and checks
 
 `npm run dev` opens the Vite development server at `http://localhost:5174`. Use `npm run test:auth` for login, session restoration, role access, sign-out, and host/path regression checks. Use `npm run build` to verify the production files Vercel will serve. These automated checks do not sign in to a real Google account.
+
+
+### Administrator overview
+
+Administrators land at `#admin`; account management is `#admin/accounts`. The overview uses the existing `/api/admin/overview`, `/api/admin/accounts`, and `/api/admin/offices` responses, without schema changes. The overview response also includes all-time counts by document type. It reports approved and enabled accounts, active offices, the all-time document total, first-sign-in adoption, enabled role assignments, active-office coverage by campus, and the latest recorded sign-in per account in Asia/Manila time. Enabled access does not mean a user is currently online.
+
+Setup checks link to filtered management lists for enabled accounts needing a valid role office, active receiving offices without enabled accounts, and active offices without officials. OP remains monitoring-only and is excluded from the receiving-office check. Each account is counted once per office even when multiple roles use it; role totals can exceed the account count. Refresh retains the last successful snapshot after a failure and rejects responses from an older refresh or role selection.
+
+The administrator sidebar replaces office workflow groups with every configured and historical document type and its all-time registry count, including zero-count types. Selecting a type opens the shared OVP Records document table, filtered by exact type across all offices. Search, status filters, pagination, attachment previews, and timelines use the existing module behavior. Count badges stay aligned on the right, and the selected type survives opening a timeline and returning to the list or reloading its URL. Office-role workspaces keep their workflow navigation. Deploy the updated `pad-api` overview and document-list filtering together with this frontend; no migration is required.
+
+
+### Travel Order registry
+
+The administrator's Travel Order type opens five counted cards, with On travel selected initially. Categories use Asia/Manila dates and valid departure/return ranges:
+
+- On travel: departed before today and returning today or later.
+- Traveling today: departure is today, including one-day trips.
+- Traveling tomorrow: departure is tomorrow.
+- Incoming travels: departure is after tomorrow.
+- Total Travels: completed trips only, with a return date before today.
+
+The categories do not overlap. Counts represent orders, not employees; the sidebar badge remains the all-time document registry count. Undated or invalid legacy schedules are excluded from the five cards and identified in the note. Completion is based on the scheduled return date, independently of document-routing status.
+
+Each travel record uses four compact content rows: a single-line document title, all employee names, departure and return together on one line, then destination. Long employee lists wrap within their row. Attachment and timeline icons stay beside the title. Travel details expands the file code, routing status, complete title and destination, purpose, travel arrangement, vehicle requirement, origin office, order date and remarks. Search, status filters, pagination, and timeline/back navigation retain the selected period; its URL restores on reload.
+
+Cards and document-type sidebar entries use locally hosted Lordicon FREE animations and the existing shared type colors. The official player animates on parent hover or keyboard focus and honors reduced motion. Static fallback icons remain available if animation data cannot load. The sidebar footer credits Lordicon; asset source/license links are recorded in public/assets/icons/lordicon/sources.json. Deploy the frontend and API together; no migration is required.

@@ -5,14 +5,21 @@ import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { presidentReport, presidentOffices, presidentDocuments } from './president-fixtures.js';
 
-const routingSource = readFileSync(new URL('../src/doc_router/index.js', import.meta.url), 'utf8').replace('export function createDocRouter', 'function createDocRouter');
+const routingSource = readFileSync(new URL('../src/doc_router/index.js', import.meta.url), 'utf8').replace('export function createDocRouter', 'function createDocRouter').replace(/^import .*;$/gm, '');
 const statisticsSource = readFileSync(new URL('../src/doc_router/statistics.js', import.meta.url), 'utf8').replace('export function createStatistics', 'function createStatistics');
 const databaseSource = readFileSync(new URL('../src/database-management.js', import.meta.url), 'utf8').replace('export function createDatabaseManagement', 'function createDatabaseManagement');
 const fileCodeSource = readFileSync(new URL('../src/file-code-settings.js', import.meta.url), 'utf8').replace('export function createFileCodeSettings', 'function createFileCodeSettings');
 const presidentSource = readFileSync(new URL('../src/president/index.js', import.meta.url), 'utf8').replace('export function createPresidentView', 'function createPresidentView');
 const attachmentSource = readFileSync(new URL('../src/attachment-preview.js', import.meta.url), 'utf8').replace(/^export /gm, '');
 const recordsSource = readFileSync(new URL('../src/records-management.js', import.meta.url), 'utf8').replace('export function createRecordsManagement', 'function createRecordsManagement');
-const source = routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + fileCodeSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + recordsSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
+const gatewaySource = readFileSync(new URL('../src/login-gateway.js', import.meta.url), 'utf8').replace('export function createLoginGateway', 'function createLoginGateway');
+const adminOverviewSource = readFileSync(new URL('../src/admin-overview.js', import.meta.url), 'utf8').replace(/^export /gm, '').replace(/^import .*;$/gm, '');
+const documentTypeSource = readFileSync(new URL('../src/document-types.js', import.meta.url), 'utf8').replace(/^export /gm, '');
+const travelOverviewSource = readFileSync(new URL('../src/travel-overview.js', import.meta.url), 'utf8').replace(/^export /gm, '').replace(/^import .*;$/gm, '');
+const iconsSource = readFileSync(new URL('../src/icons.js', import.meta.url), 'utf8').replace(/^export /gm, '');
+const source = iconsSource + '\n' + documentTypeSource + '\n' + travelOverviewSource + '\n' + adminOverviewSource + '\n' + gatewaySource + '\n' + routingSource + '\n' + statisticsSource + '\n' + databaseSource + '\n' + fileCodeSource + '\n' + presidentSource + '\n' + attachmentSource + '\n' + recordsSource + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8')
+  .replace("import { createAdminOverview } from './admin-overview.js';", '')
+  .replace("import { createLoginGateway } from './login-gateway.js';", '')
   .replace("import { createDocRouter } from './doc_router/index.js';", '').replace("import { createStatistics } from './doc_router/statistics.js';", '')
   .replace("import { createDatabaseManagement } from './database-management.js';", '')
   .replace("import { createFileCodeSettings } from './file-code-settings.js';", '')
@@ -247,7 +254,7 @@ function page({ token, authorize = true, restore = true, role = 'staff',
       const classes = new Set(['app-view', 'role-view'].includes(id) || (id.startsWith('section-') && id !== 'section-dashboard') ? ['d-none'] : []);
       const attributes = new Map();
       elements.set(id, {
-        id, textContent: '', innerHTML: '', value: '', dataset: {}, clientWidth: id === 'google-signin' ? googleWidth : 0,
+        id, textContent: '', innerHTML: '', value: '', dataset: {}, style: { setProperty() {} }, clientWidth: id === 'google-signin' ? googleWidth : 0,
         getBoundingClientRect() { return { width: this.clientWidth }; },
         classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name),
           contains: (name) => classes.has(name), toggle: (name, on) => on ? classes.add(name) : classes.delete(name) },
@@ -308,7 +315,7 @@ function page({ token, authorize = true, restore = true, role = 'staff',
       } else if (path === '/api/me') {
         status = restore ? 200 : 401;
         body = restore ? { user } : { message: 'Your session has expired. Please sign in again.' };
-      } else if (path === '/api/admin/overview') body = { data: { users: 1, active_users: 1, offices: 2, documents: 0 } };
+      } else if (path === '/api/admin/overview') body = { data: { users: 1, active_users: 1, offices: 2, documents: 0, document_types: [] } };
       else if (path === '/api/admin/accounts') body = { data: accounts };
       else if (path === '/api/admin/offices') body = { data: offices };
       else body = { data: [] };
@@ -1686,4 +1693,216 @@ test('role reset aborts a loading queue and a late response cannot restore docum
   await refresh;
   assert.doesNotMatch(app.element('document-list').innerHTML, /Private old response/);
   assert.equal(app.element('document-list').getAttribute('aria-busy'), 'false');
+});
+
+
+test('administrator overview is the default and management routes remain available', async () => {
+  const app=page({token:'admin-test',role:'admin'});
+  await flush();
+  assert.equal(app.element('admin-overview-panel').classList.contains('d-none'),false);
+  assert.equal(app.element('admin-accounts-panel').classList.contains('d-none'),true);
+  assert.equal(app.element('admin-page-title').textContent,'Administrator overview');
+  vm.runInContext("showAdminTab('accounts')",app.context);
+  assert.equal(app.url(),'#admin/accounts');
+  assert.equal(app.element('admin-overview-panel').classList.contains('d-none'),true);
+  vm.runInContext("changeSection('dashboard')",app.context);
+  assert.equal(app.url(),'#admin');
+  assert.equal(app.element('section-dashboard').classList.contains('d-none'),true);
+});
+
+test('failed admin refresh retains the previous snapshot and allows retry', async () => {
+  let fail=false;
+  const app=page({token:'admin-test',role:'admin',respond(path){if(fail&&path==='/api/admin/overview')return {status:503,body:{message:'Temporary outage.'}};}});
+  await flush();fail=true;
+  await app.element('admin-overview-refresh').click();
+  assert.match(app.element('admin-overview-status').textContent,/previous snapshot/);
+  assert.equal(app.element('admin-overview-refresh').disabled,false);
+  assert.equal(app.element('admin-users-total').textContent,1);
+  fail=false;await app.element('admin-overview-refresh').click();
+  assert.match(app.element('admin-overview-status').textContent,/Updated/);
+});
+
+test('admin data from an earlier refresh cannot overwrite a newer snapshot', async () => {
+  let delayed=false;let finish;
+  const app=page({token:'admin-test',role:'admin',respond(path){if(delayed&&path==='/api/admin/overview'){delayed=false;return new Promise(resolve=>{finish=resolve;});}}});
+  await flush();delayed=true;
+  const earlier=vm.runInContext('loadAdmin()',app.context);await flush();
+  await vm.runInContext('loadAdmin()',app.context);
+  finish({body:{data:{users:999,active_users:999,offices:999,documents:999}}});await earlier;
+  assert.equal(app.element('admin-users-total').textContent,1);
+});
+
+test('an initial admin load failure shows retry instead of fabricated figures', async () => {
+  const app=page({token:'admin-test',role:'admin',respond(path){if(path==='/api/admin/overview')return {status:503,body:{message:'Temporary outage.'}};}});
+  await flush();
+  assert.match(app.element('admin-overview-status').textContent,/unavailable/);
+  assert.equal(app.element('admin-overview-refresh').disabled,false);
+  assert.equal(vm.runInContext('state.admin.overview',app.context),null);
+});
+
+test('overview escapes names and campus labels supplied by account and office data', async () => {
+  const app=page({token:'admin-test',role:'admin',accounts:[{id:7,name:'<script>staff</script>',email:'<img>@example.test',roles:['admin'],is_active:1,last_login_at:'2026-11-05 00:00:00'}],offices:[{id:8,name:'Office',campus:'<img onerror=alert(1)>',code:'TEST',is_active:1,officials:[]}]});
+  await flush();
+  assert.match(app.element('admin-recent-list').innerHTML,/&lt;script&gt;/);
+  assert.doesNotMatch(app.element('admin-recent-list').innerHTML,/<script>/);
+  assert.match(app.element('admin-campus-list').innerHTML,/&lt;img/);
+  assert.doesNotMatch(app.element('admin-campus-list').innerHTML,/<img/);
+});
+
+
+test('administrator document type sidebar renders zero-count and historical types safely', async () => {
+  const app=page({token:'admin-test',role:'admin',respond(path){if(path==='/api/admin/overview')return {body:{data:{users:1,active_users:1,offices:0,documents:3,document_types:[{name:'Memorandum',documents:2},{name:'Travel Order',documents:0},{name:'<Historical>',documents:1}]}}};}});
+  await flush();
+  const html=app.element('admin-document-types-list').innerHTML;
+  assert.match(html,/Travel Order/);assert.match(html,/admin-document-type-count">0/);
+  assert.match(html,/&lt;Historical&gt;/);assert.doesNotMatch(html,/<Historical>/);
+  assert.equal(app.element('app-view').classList.contains('is-admin'),true);
+  app.element('role-logout-button').click();
+  assert.doesNotMatch(app.element('admin-document-types-list').innerHTML,/Memorandum/);
+});
+
+const adminTypeDocuments = Array.from({length:25},(_,i)=>({
+  reference_no:'TYPE-'+String(i+1).padStart(4,'0'),subject:'Sample particulars '+(i+1),document_type:'Travel Order & Research',
+  origin_type:'office',current_office_id:2,current_office_name:'Records',source_office_id:3,source_office_name:'Owner office',
+  status:'completed',created_at:'2026-11-06 00:00:00',updated_at:'2026-11-06 01:00:00',permissions:{},history:[]
+}));
+function adminTypeResponse(path,_options,url) {
+  if(path==='/api/routing/workspace') {
+    const type=url.searchParams.get('document_type');
+    let rows=type==='Travel Order & Research'?adminTypeDocuments:[];
+    const search=url.searchParams.get('search');
+    if(search)rows=rows.filter(row=>row.reference_no.includes(search));
+    if(url.searchParams.get('status'))rows=rows.filter(row=>row.status===url.searchParams.get('status'));
+    const pages=Math.max(1,Math.ceil(rows.length/20));
+    const pageNumber=Math.min(pages,Math.max(1,Number(url.searchParams.get('page')||1)));
+    return {body:{data:rows.slice((pageNumber-1)*20,pageNumber*20),counts:{all:100},can_read_all_timelines:true,can_monitor:true,office:null,pagination:{page:pageNumber,pages,total:rows.length}}};
+  }
+  if(path.startsWith('/api/documents/'))return {body:{data:adminTypeDocuments[20]}};
+}
+
+test('selecting an admin type opens the Records document table with one exact type request', async () => {
+  const app=page({token:'admin-test',role:'admin',respond:adminTypeResponse});await flush();
+  const before=app.calls.length;
+  await vm.runInContext("officeRouting.showDocumentType('Travel Order & Research')",app.context);
+  const calls=app.calls.slice(before).filter(call=>call.path==='/api/routing/workspace');
+  assert.equal(calls.length,1);
+  const params=new URL(calls[0].url).searchParams;
+  assert.equal(params.get('document_type'),'Travel Order & Research');assert.equal(params.get('office_id'),'all');assert.equal(params.get('queue'),'all');
+  assert.equal(app.calls.slice(before).some(call=>call.path==='/api/routing/statistics'),false);
+  assert.equal(app.url(),'#admin/documents?type=Travel%20Order%20%26%20Research');
+  assert.equal(app.element('section-documents').classList.contains('d-none'),false);
+  assert.equal(app.element('document-table-wrap').classList.contains('d-none'),false);
+  assert.equal(app.element('received-card-list').classList.contains('d-none'),true);
+  assert.equal(app.element('routing-queue-title').textContent,'Travel Order & Research');
+  assert.match(app.element('document-list').innerHTML,/Show Time Line/);
+  assert.match(app.element('document-list').innerHTML,/SAMPLE PARTICULARS 1/);
+  assert.doesNotMatch(app.element('document-list').innerHTML,/SAMPLE PARTICULARS 21/);
+  assert.match(app.element('routing-document-count').textContent,/25 documents/);
+});
+
+test('type filter survives pagination, timeline navigation and returning without clearing search/status', async () => {
+  const app=page({token:'admin-test',role:'admin',respond:adminTypeResponse});await flush();
+  await vm.runInContext("officeRouting.showDocumentType('Travel Order & Research')",app.context);
+  vm.runInContext("officeRouting.handleClick({target:{closest:s=>s==='[data-routing-page]'?{dataset:{routingPage:'1'}}:null}})",app.context);await flush();
+  assert.match(app.element('document-list').innerHTML,/SAMPLE PARTICULARS 21/);
+  assert.match(app.element('routing-document-count').textContent,/Page 2 of 2/);
+  await vm.runInContext("openDocument('TYPE-0021')",app.context);
+  assert.equal(app.url(),'#admin/document/TYPE-0021?type=Travel%20Order%20%26%20Research');
+  assert.match(app.element('document-detail').innerHTML,/SAMPLE PARTICULARS 21/);
+  vm.runInContext("officeRouting.handleClick({target:{closest:s=>s==='[data-back-to-queue]'?{}:null}})",app.context);await flush();
+  assert.equal(app.url(),'#admin/documents?type=Travel%20Order%20%26%20Research');
+  assert.match(app.element('routing-document-count').textContent,/Page 2 of 2/);
+  app.element('document-search').value='TYPE-0021';app.element('status-filter').value='completed';
+  await vm.runInContext('officeRouting.refresh()',app.context);
+  const last=app.calls.filter(call=>call.path==='/api/routing/workspace').at(-1);
+  const params=new URL(last.url).searchParams;
+  assert.equal(params.get('document_type'),'Travel Order & Research');assert.equal(params.get('search'),'TYPE-0021');assert.equal(params.get('status'),'completed');
+  assert.match(app.element('routing-document-count').textContent,/1 document/);
+  vm.runInContext("changeSection('admin')",app.context);
+  assert.equal(vm.runInContext('officeRouting.currentDocumentType()',app.context),'');
+});
+
+test('administrator type list restores from a URL and zero-count types show an empty list', async () => {
+  const app=page({token:'admin-test',role:'admin',hash:'#admin/documents?type=Travel%20Order%20%26%20Research',respond:adminTypeResponse});await flush();
+  assert.equal(app.element('routing-queue-title').textContent,'Travel Order & Research');
+  assert.equal(app.url(),'#admin/documents?type=Travel%20Order%20%26%20Research');
+  await vm.runInContext("officeRouting.showDocumentType('Unused Type')",app.context);
+  assert.match(app.element('document-list').innerHTML,/No matching documents for this type/);
+  assert.equal(app.element('routing-prev').disabled,true);assert.equal(app.element('routing-next').disabled,true);
+  assert.equal(app.element('routing-document-count').textContent,'No matching documents');
+});
+
+test('non-administrator office roles cannot open administrator type lists', async () => {
+  const app=page({token:'office-test',profile:{roles:['ovp_central_records'],office_id:2}});await flush();
+  const before=app.calls.length;
+  await vm.runInContext("officeRouting.showDocumentType('Memorandum')",app.context);
+  assert.equal(app.calls.length,before);
+  assert.equal(vm.runInContext('officeRouting.currentDocumentType()',app.context),'');
+});
+
+test('switching types cancels the old list and a late response cannot replace the selection', async () => {
+  let resolveFirst;let firstSignal;
+  const app=page({token:'admin-test',role:'admin',respond(path,options,url){
+    if(path==='/api/routing/workspace'&&url.searchParams.get('document_type')==='First Type') {firstSignal=options.signal;return new Promise(resolve=>{resolveFirst=resolve;});}
+    return adminTypeResponse(path,options,url);
+  }});await flush();
+  const first=vm.runInContext("officeRouting.showDocumentType('First Type')",app.context);await flush();
+  await vm.runInContext("officeRouting.showDocumentType('Travel Order & Research')",app.context);
+  assert.equal(firstSignal.aborted,true);
+  resolveFirst({body:{data:[],pagination:{page:1,pages:1,total:0}}});await first;
+  assert.equal(app.element('routing-queue-title').textContent,'Travel Order & Research');
+  assert.match(app.element('document-list').innerHTML,/SAMPLE PARTICULARS 1/);
+});
+
+
+test('selecting a document type closes the mobile overlay without collapsing desktop navigation', async () => {
+  const app=page({token:'admin-test',role:'admin',respond:adminTypeResponse});await flush();
+  const calls=[];
+  app.context.window.Helpers={isSmallScreen:()=>true,setCollapsed:value=>calls.push(value)};
+  await vm.runInContext("officeRouting.showDocumentType('Travel Order & Research')",app.context);
+  assert.deepEqual(calls,[true]);
+  app.context.window.Helpers.isSmallScreen=()=>false;
+  await vm.runInContext("officeRouting.showDocumentType('Unused Type')",app.context);
+  assert.deepEqual(calls,[true]);
+});
+
+
+const travelOrderFixture={...adminTypeDocuments[0],document_type:'Travel Order',personnel:[{id:1,name:'Ana Santos'},{id:2,name:'Maya Reyes'}],travel_details:{departure_date:'2026-11-05',return_date:'2026-11-07',destination:'Davao',purpose:'Faculty workshop',travel_type:'Official Business',vehicle_requirement:'Not Necessary',order_date:'2026-11-01'}};
+const travelDayFixture={...travelOrderFixture,id:2,reference_no:'TYPE-0002',travel_details:{...travelOrderFixture.travel_details,departure_date:'2026-11-06',return_date:'2026-11-06'}};
+const travelDoneFixture={...travelOrderFixture,id:3,reference_no:'TYPE-0003',travel_details:{...travelOrderFixture.travel_details,departure_date:'2026-11-01',return_date:'2026-11-04'}};
+const travelSummaryFixture={today:'2026-11-06',tomorrow:'2026-11-07',counts:{ongoing:1,today:1,tomorrow:0,incoming:0,completed:1,total:3,unscheduled:0}};
+function travelOrderResponse(path,options,url){
+ if(path==='/api/routing/workspace'&&url.searchParams.get('document_type')==='Travel Order'){
+  const period=url.searchParams.get('travel_window');
+  const data=period==='ongoing'?[travelOrderFixture]:period==='today'?[travelDayFixture]:period==='completed'?[travelDoneFixture]:[];
+  return {body:{data,counts:{all:3},travel_summary:travelSummaryFixture,can_monitor:true,can_read_all_timelines:true,pagination:{page:1,pages:1,total:data.length}}};
+ }
+ if(path.startsWith('/api/documents/'))return {body:{data:path.endsWith('TYPE-0002')?travelDayFixture:path.endsWith('TYPE-0003')?travelDoneFixture:travelOrderFixture}};
+ return adminTypeResponse(path,options,url);
+}
+test('Travel Order type opens five counted cards and every employee with departure/return dates',async()=>{
+ const app=page({token:'admin-travel',role:'admin',respond:travelOrderResponse});await flush();await vm.runInContext("officeRouting.showDocumentType('Travel Order')",app.context);
+ assert.equal(app.element('travel-overview').classList.contains('d-none'),false);assert.equal(app.element('document-table-wrap').classList.contains('d-none'),true);
+ assert.match(app.element('travel-summary-cards').innerHTML,/Traveling today/);assert.match(app.element('travel-summary-cards').innerHTML,/Total Travels/);
+ assert.match(app.element('travel-records-list').innerHTML,/Ana Santos/);assert.match(app.element('travel-records-list').innerHTML,/Maya Reyes/);assert.match(app.element('travel-records-list').innerHTML,/Nov 7, 2026/);
+ const params=new URL(app.calls.filter(call=>call.path==='/api/routing/workspace').at(-1).url).searchParams;assert.equal(params.get('travel_window'),'ongoing');
+});
+test('travel cards filter the list and preserve their period through timeline return and URL restoration',async()=>{
+ const app=page({token:'admin-travel',role:'admin',respond:travelOrderResponse});await flush();await vm.runInContext("officeRouting.showDocumentType('Travel Order')",app.context);
+ vm.runInContext("officeRouting.handleClick({target:{closest:s=>s==='[data-travel-window]'?{dataset:{travelWindow:'today'}}:null}})",app.context);await flush();
+ assert.equal(app.url(),'#admin/documents?type=Travel%20Order&travel=today');
+ assert.equal(new URL(app.calls.filter(call=>call.path==='/api/routing/workspace').at(-1).url).searchParams.get('travel_window'),'today');
+ await vm.runInContext("openDocument('TYPE-0002')",app.context);assert.equal(app.url(),'#admin/document/TYPE-0002?type=Travel%20Order&travel=today');
+ vm.runInContext("officeRouting.handleClick({target:{closest:s=>s==='[data-back-to-queue]'?{}:null}})",app.context);await flush();assert.equal(app.url(),'#admin/documents?type=Travel%20Order&travel=today');
+ const restored=page({token:'admin-travel',role:'admin',hash:'#admin/documents?type=Travel%20Order&travel=tomorrow',respond:travelOrderResponse});await flush();
+ assert.equal(new URL(restored.calls.filter(call=>call.path==='/api/routing/workspace').at(-1).url).searchParams.get('travel_window'),'tomorrow');
+ await vm.runInContext("officeRouting.showDocumentType('Memorandum')",app.context);assert.equal(app.element('travel-overview').classList.contains('d-none'),true);
+});
+
+test('completed travel card uses only the completed period and restores from its URL',async()=>{
+ const app=page({token:'admin-travel',role:'admin',hash:'#admin/documents?type=Travel%20Order&travel=completed',respond:travelOrderResponse});await flush();
+ const params=new URL(app.calls.filter(call=>call.path==='/api/routing/workspace').at(-1).url).searchParams;
+ assert.equal(params.get('travel_window'),'completed');
+ assert.match(app.element('travel-summary-cards').innerHTML,/data-travel-window="completed" aria-pressed="true"/);
+ assert.match(app.element('travel-records-list').innerHTML,/TYPE-0003/);assert.doesNotMatch(app.element('travel-records-list').innerHTML,/TYPE-0001|TYPE-0002/);
 });

@@ -30,14 +30,16 @@ export function createStatistics({ state, api, byId, escapeHtml, formatDate }) {
 
   function render(report) {
     const global = report.scope === 'global';
+    const administrator = global && state.activeRole === 'admin';
     const office = report.office?.name || state.user?.office_name || 'Your office';
-    byId('statistics-title').textContent = global ? 'OVP Statistics' : 'Office Statistics';
-    byId('statistics-description').textContent = global ? 'Shared document statistics for OVP PAD and OVP Central Records across all offices.' : `Documents involving ${office}, including records tracked after they leave your office.`;
-    byId('statistics-scope').textContent = global ? 'All offices · shared OVP report' : office;
+    byId('statistics-title').textContent = administrator ? 'Document statistics' : global ? 'OVP Statistics' : 'Office Statistics';
+    byId('statistics-description').textContent = administrator ? 'University-wide document counts and activity for the selected type and reporting period.' : global ? 'Shared document statistics for OVP PAD and OVP Central Records across all offices.' : `Documents involving ${office}, including records tracked after they leave your office.`;
+    byId('statistics-scope').textContent = administrator ? 'All offices · administrator report' : global ? 'All offices · shared OVP report' : office;
     byId('statistics-updated').textContent = `Updated ${formatDate(report.server_time)}`;
     byId('statistics-start').value = report.filters.start_date;
     byId('statistics-end').value = report.filters.end_date;
-    byId('statistics-type').innerHTML = '<option value="">All document types</option>' + report.document_types.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+    const types = [...new Set([...report.document_types, report.filters.document_type].filter(Boolean))];
+    byId('statistics-type').innerHTML = '<option value="">All document types</option>' + types.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
     byId('statistics-type').value = report.filters.document_type;
     byId('statistics-workload-office').textContent = office;
     const snapshot = report.snapshot;
@@ -113,5 +115,9 @@ export function createStatistics({ state, api, byId, escapeHtml, formatDate }) {
     });
     byId('statistics-reset').addEventListener('click', () => { filters = {}; load(); });
   }
-  return { load, reset, bind };
+  function selectType(documentType) {
+    filters = { document_type: documentType };
+    return load();
+  }
+  return { load, reset, bind, selectType };
 }

@@ -1,3 +1,5 @@
+import { createAdminOverview } from './admin-overview.js';
+import { createLoginGateway } from './login-gateway.js';
 import { createDocRouter } from './doc_router/index.js';
 import { createStatistics } from './doc_router/statistics.js';
 import { createDatabaseManagement } from './database-management.js';
@@ -18,12 +20,15 @@ const deleteModal = new bootstrap.Modal(byId('admin-delete-modal'));
 const adminPages = { account: 1, office: 1, official: 1 };
 const accountRoleIds = ['admin', 'ovp_pad', 'ovp_central_records', 'sksu_officials'];
 const moduleRoleIds = ['ovp_pad', 'ovp_central_records', 'sksu_officials'];
-let adminTab = 'accounts';
+let adminTab = 'overview';
+let adminLoadRequest = 0;
 let pendingDeletion = null;
 let googleSignInPromise = null;
 let googleButtonResizeObserver = null;
 let signingIn = false;
+const authGateway = createLoginGateway({ byId, onOpen: () => loadGoogleSignIn() });
 let roleRequest = 0;
+const adminOverview = createAdminOverview({ state, byId, escapeHtml, accountRoles, formatDate });
 const officeStatistics = createStatistics({ state, api, byId, escapeHtml, formatDate });
 const presidentView = createPresidentView({ state, api, byId, escapeHtml, formatDate, downloadDocument, signOut,
   switchRole: () => showRolePicker(true).catch((error) => { byId('role-error').textContent = error.message; byId('role-error').classList.remove('d-none'); }) });
@@ -90,6 +95,7 @@ function isRoutingRole(role = state.activeRole) {
 }
 
 async function showRolePicker(refresh = false) {
+  adminOverview.reset();
   const current = ++roleRequest;
   state.activeRole = null;
   presidentView.reset();
@@ -162,6 +168,7 @@ async function enterAccountRole(role, requestedHash = '') {
   attachmentPreview.reset();
   const current = ++roleRequest;
   state.activeRole = role;
+  adminOverview.reset();
   const response = await api('/api/me');
   if (current !== roleRequest || !state.token) return;
   state.user = response.user;
@@ -179,18 +186,24 @@ async function enterAccountRole(role, requestedHash = '') {
     await presidentView.enter(requestedHash);
     return;
   }
-  const requestedTab = requestedHash.split('/')[1];
-  const statisticsRequested = requestedHash === '#statistics' || ['#doc_router/statistics', '#routing/statistics'].includes(requestedHash);
+  const [hashPath, hashQuery = ''] = requestedHash.split('?');
+  const hashParameters = new URLSearchParams(hashQuery);
+  const adminTypeRoute = role === 'admin' && hashParameters.has('type')
+    && (hashPath === '#admin/documents' || hashPath.startsWith('#admin/document/'));
+  const requestedTab = hashPath.split('/')[1];
+  const statisticsRequested = hashPath === '#statistics' || ['#doc_router/statistics', '#routing/statistics'].includes(hashPath);
   const routingRequested = isRoutingRole(role)
-    ? requestedHash === '#doc_router' || requestedHash.startsWith('#doc_router/')
-    : requestedHash.startsWith('#routing/') || requestedHash === '#documents';
-  if (role === 'admin' && ['accounts', 'offices', 'officials', 'file-codes', 'database'].includes(requestedTab)) adminTab = requestedTab;
+    ? hashPath === '#doc_router' || hashPath.startsWith('#doc_router/')
+    : adminTypeRoute || hashPath.startsWith('#routing/') || hashPath === '#documents';
+  if (role === 'admin' && ['overview', 'accounts', 'offices', 'officials', 'file-codes', 'database'].includes(requestedTab)) adminTab = requestedTab;
   const isDetail = routingRequested && requestedTab === 'document';
-  if (routingRequested && !isDetail && !statisticsRequested) officeRouting.setQueue(requestedTab || 'all');
+  if (adminTypeRoute) officeRouting.setDocumentType(hashParameters.get('type'), hashParameters.get('travel') || 'ongoing');
+  else if (routingRequested && !isDetail && !statisticsRequested) officeRouting.setQueue(requestedTab || 'all');
   const useQueue = routingRequested && requestedTab && !isDetail && !statisticsRequested;
-  const landing = statisticsRequested ? 'statistics' : useQueue || isDetail ? 'documents' : isRoutingRole(role) || requestedHash === '#dashboard' ? 'dashboard' : 'admin';
+  const landing = statisticsRequested ? 'statistics' : useQueue || isDetail ? 'documents' : isRoutingRole(role) || hashPath === '#dashboard' ? 'dashboard' : 'admin';
   changeSection(landing);
-  if (useQueue) window.history.replaceState(null, '', `#${isRoutingRole(role) ? 'doc_router' : 'routing'}/${officeRouting.currentQueue()}`);
+  if (adminTypeRoute && !isDetail) window.history.replaceState(null, '', officeRouting.documentTypeHash());
+  else if (useQueue) window.history.replaceState(null, '', `#${isRoutingRole(role) ? 'doc_router' : 'routing'}/${officeRouting.currentQueue()}`);
   byId('auth-view').classList.add('d-none');
   byId('role-view').classList.add('d-none');
   byId('app-view').classList.remove('d-none');
@@ -200,7 +213,7 @@ async function enterAccountRole(role, requestedHash = '') {
   if (current !== roleRequest) return;
   await loadAdmin();
   if (role === 'ovp_central_records' && requestedTab === 'management') await recordsManagement.open(requestedHash.split('/')[2]);
-  if (isDetail && requestedHash.split('/')[2]) await openDocument(decodeURIComponent(requestedHash.split('/')[2]));
+  if (isDetail && hashPath.split('/')[2]) await openDocument(decodeURIComponent(hashPath.split('/')[2]));
 }
 
 async function chooseAccountRole(role) {
@@ -229,6 +242,7 @@ function initials(name) { return (name || 'CT').split(' ').filter(Boolean).slice
 
 function setProfile() {
   const { user } = state;
+  byId('app-view').classList.toggle('is-admin', Boolean(isAdministrator()));
   const monitoringOffice = state.activeRole === 'university_president' || String(user.office_code || '').toUpperCase() === 'OP';
   document.querySelectorAll('[data-open-upload], #new-document-button').forEach((button) => {
     button.classList.toggle('d-none', monitoringOffice);
@@ -362,7 +376,7 @@ function renderAdminAccounts() {
   const status = byId('admin-account-status').value;
   const rows = state.admin.accounts.filter((account) => {
     const haystack = [account.name, account.email, account.position, account.campus, accountRoles(account).map(roleLabel).join(' '), accountOfficeLabel(account), account.office_name, account.office_campus].join(' ').toLowerCase();
-    return (!query || haystack.includes(query)) && (!status || (status === 'pending' ? !account.last_login_at : status === 'active' ? Number(account.is_active) === 1 : Number(account.is_active) === 0));
+    return (!query || haystack.includes(query)) && (!status || (['assignment', 'awaiting'].includes(status) ? adminOverview.matchesAccount(account, status) : status === 'pending' ? !account.last_login_at : status === 'active' ? Number(account.is_active) === 1 : Number(account.is_active) === 0));
   });
   byId('admin-users-list').innerHTML = adminPageRows(rows, 'account').map((account) =>
     '<tr><td>' + identityLabel(account.name, account.email) +
@@ -380,9 +394,10 @@ function renderAdminOffices() {
   const query = byId('admin-office-search').value.trim().toLowerCase();
   const campus = byId('admin-office-campus-filter').value;
   const status = byId('admin-office-status').value;
+  const coverage = byId('admin-office-coverage').value;
   const rows = state.admin.offices.filter((office) => {
     const haystack = [office.code, office.name, office.domain, office.campus, office.contact_email, ...(office.officials || []).flatMap((official) => [official.name, official.position, official.email, official.alternate_email])].join(' ').toLowerCase();
-    return (!query || haystack.includes(query)) && (!campus || (office.campus || '__unspecified') === campus) && (status === '' || Number(office.is_active) === Number(status));
+    return (!query || haystack.includes(query)) && (!campus || (office.campus || '__unspecified') === campus) && (status === '' || Number(office.is_active) === Number(status)) && adminOverview.matchesOffice(office, coverage);
   });
   byId('admin-offices-list').innerHTML = adminPageRows(rows, 'office').map((office) => {
     const active = Number(office.is_active) === 1;
@@ -412,10 +427,7 @@ function renderAdminOfficials() {
 
 function renderAdmin() {
   if (!isAdministrator() || !state.admin.overview) return;
-  byId('admin-users-total').textContent = state.admin.overview.users;
-  byId('admin-users-active').textContent = state.admin.overview.active_users;
-  byId('admin-offices-total').textContent = state.admin.overview.offices;
-  byId('admin-documents-total').textContent = state.admin.overview.documents;
+  adminOverview.render();
   const campusFilter = byId('admin-office-campus-filter').value;
   const campuses = [...new Set(state.admin.offices.map((office) => office.campus).filter(Boolean))].sort();
   const domains = [...new Set(state.admin.offices.map((office) => office.domain).filter(Boolean))].sort();
@@ -430,29 +442,48 @@ function renderAdmin() {
   renderAdminAccounts();
   renderAdminOffices();
   renderAdminOfficials();
+  officeRouting.updateNavigation();
 }
 
 function showAdminTab(tab) {
-  if (!isAdministrator() || !['accounts', 'offices', 'officials', 'file-codes', 'database'].includes(tab)) return;
+  if (!isAdministrator() || !['overview', 'accounts', 'offices', 'officials', 'file-codes', 'database'].includes(tab)) return;
   adminTab = tab;
-  ['accounts', 'offices', 'officials', 'file-codes', 'database'].forEach((name) => byId('admin-' + name + '-panel').classList.toggle('d-none', name !== tab));
+  const headings = {
+    overview: ['Administrator overview', 'Account access, office coverage, and the records behind your university.'],
+    accounts: ['User accounts', 'Manage authorized accounts, access permissions, and role assignments.'],
+    offices: ['Routing offices', 'Manage active destinations, office assignments, and official contacts.'],
+    officials: ['Office officials', 'Keep the university official directory and contact details current.'],
+    'file-codes': ['File code settings', 'Review annual document numbering and future registration codes.'],
+    database: ['Database management', 'Review administrative database operations and recovery backups.']
+  };
+  byId('admin-page-title').textContent = headings[tab][0];
+  byId('admin-page-description').textContent = headings[tab][1];
+  ['overview', 'accounts', 'offices', 'officials', 'file-codes', 'database'].forEach((name) => byId('admin-' + name + '-panel').classList.toggle('d-none', name !== tab));
   if (tab === 'database') databaseManagement.load();
   if (tab === 'file-codes') fileCodeSettings.load();
   document.querySelectorAll('[data-admin-nav]').forEach((item) => item.classList.toggle('active', !byId('section-admin').classList.contains('d-none') && item.dataset.adminNav === tab));
-  if (!byId('section-admin').classList.contains('d-none')) window.history.replaceState(null, '', tab === 'accounts' ? '#admin' : '#admin/' + tab);
+  if (!byId('section-admin').classList.contains('d-none')) window.history.replaceState(null, '', tab === 'overview' ? '#admin' : '#admin/' + tab);
 }
 
 async function loadAdmin() {
   if (!isAdministrator()) return;
+  const current = ++adminLoadRequest;
+  const role = roleRequest;
+  const snapshotRequest = adminOverview.setLoading();
   try {
     const [overview, accounts, offices] = await Promise.all([api('/api/admin/overview'), api('/api/admin/accounts'), api('/api/admin/offices')]);
-    if (!isAdministrator()) return;
+    if (!isAdministrator() || current !== adminLoadRequest || role !== roleRequest) return;
     state.admin.overview = overview.data;
     state.admin.accounts = accounts.data;
     state.admin.offices = offices.data;
     state.admin.officials = offices.data.flatMap((office) => (office.officials || []).map((official) => ({ ...official, office_name: office.name, office_campus: office.campus, office_active: office.is_active })));
     renderAdmin();
-  } catch (error) { showNotice(error.message); }
+  } catch (error) {
+    if (isAdministrator() && current === adminLoadRequest && role === roleRequest) {
+      adminOverview.fail(error.message, snapshotRequest);
+      showNotice(error.message);
+    }
+  }
 }
 
 function openAdminAccount(id = null) {
@@ -722,8 +753,10 @@ async function confirmAdminDelete(event) {
   } finally { button.disabled = false; }
 }
 
-function changeSection(section) {
+function changeSection(section, documentType) {
+  if (isAdministrator() && section === 'dashboard') { section = 'admin'; adminTab = 'overview'; }
   if (state.activeRole === 'university_president') return;
+  if (!['documents', 'track'].includes(section)) officeRouting.clearDocumentType();
   if (!['dashboard', 'statistics', 'documents', 'track', 'admin', 'management'].includes(section) || (section === 'admin' && !isAdministrator())
     || (section === 'management' && (state.activeRole !== 'ovp_central_records' || !accountRoles().includes('ovp_central_records')))) {
     section = 'dashboard';
@@ -732,11 +765,14 @@ function changeSection(section) {
   document.querySelectorAll('[data-nav]').forEach((element) => element.classList.toggle('active', element.dataset.nav === section));
   document.querySelectorAll('[data-admin-nav]').forEach((element) => element.classList.toggle('active', section === 'admin' && element.dataset.adminNav === adminTab));
   if (state.user) window.history.replaceState(null, '', isRoutingRole() ? section === 'dashboard' ? '#doc_router' : section === 'statistics' ? '#doc_router/statistics' : `#doc_router/${officeRouting.currentQueue()}` : `#${section}`);
-  if (section === 'statistics' && state.user && state.activeRole) officeStatistics.load();
+  if (section === 'statistics' && state.user && state.activeRole) {
+    if (typeof documentType === 'string') officeStatistics.selectType(documentType);
+    else officeStatistics.load();
+  }
   if (section === 'admin') showAdminTab(adminTab);
   officeRouting.updateNavigation();
   recordsManagement.markNavigation();
-  if (window.Helpers && window.Helpers._toggleCollapsed) document.querySelector('.layout-overlay')?.click();
+  if (window.Helpers?.isSmallScreen?.()) window.Helpers.setCollapsed(true);
 }
 
 async function openDocument(reference) { await officeRouting.openDocument(reference); }
@@ -801,7 +837,7 @@ function signOut(message = 'Sign in with your authorized Google account.') {
   localStorage.removeItem('pad_active_role');
   state.token = null; state.user = null; state.activeRole = null; state.documents = []; state.offices = [];
   state.admin = { overview: null, accounts: [], offices: [], officials: [] };
-  adminTab = 'accounts'; pendingDeletion = null;
+  adminTab = 'overview'; adminOverview.reset(); pendingDeletion = null;
   uploadModal.hide();
   accountModal.hide();
   officeModal.hide();
@@ -810,6 +846,7 @@ function signOut(message = 'Sign in with your authorized Google account.') {
   byId('app-view').classList.add('d-none');
   byId('role-view').classList.add('d-none');
   byId('auth-view').classList.remove('d-none');
+  authGateway.setOpen(true, false);
   window.history.replaceState(null, '', window.location.pathname + window.location.search);
   window.google?.accounts?.id?.disableAutoSelect();
   byId('auth-status').textContent = message;
@@ -821,6 +858,7 @@ window.handleGoogleCredential = async ({ credential } = {}) => {
   if (signingIn) return;
   if (!credential) { byId('auth-status').textContent = 'Choose a Google account to sign in.'; return; }
   signingIn = true;
+  authGateway.setBusy(true);
   byId('auth-status').textContent = 'Verifying your account…';
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/google`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential }) });
@@ -833,7 +871,7 @@ window.handleGoogleCredential = async ({ credential } = {}) => {
     state.activeRole = null;
     await startApp();
   } catch (error) { byId('auth-status').textContent = error.message; }
-  finally { signingIn = false; }
+  finally { signingIn = false; authGateway.setBusy(false); }
 };
 
 function showGooglePlaceholder(message) {
@@ -923,7 +961,7 @@ document.addEventListener('click', (event) => {
   const roleChoice = event.target.closest('[data-choose-role]');
   if (roleChoice) { chooseAccountRole(roleChoice.dataset.chooseRole); return; }
   const section = event.target.closest('[data-section]');
-  if (section) { event.preventDefault(); changeSection(section.dataset.section); if (section.dataset.section === 'dashboard') officeRouting.overview(); }
+  if (section) { event.preventDefault(); changeSection(section.dataset.section); if (section.dataset.section === 'dashboard' && !isAdministrator()) officeRouting.overview(); }
   const downloadLink = event.target.closest('a[href*="/download"]');
   if (downloadLink) {
     event.preventDefault();
@@ -937,6 +975,27 @@ document.addEventListener('click', (event) => {
   officeRouting.handleClick(event);
   databaseManagement.handleClick(event);
   recordsManagement.handleClick(event);
+  const insight = event.target.closest('[data-admin-insight]');
+  if (insight && isAdministrator()) {
+    const key = insight.dataset.adminInsight;
+    if (['all', 'active', 'awaiting', 'assignment'].includes(key)) {
+      byId('admin-account-search').value = ''; byId('admin-account-status').value = key === 'all' ? '' : key; adminPages.account = 1;
+      changeSection('admin'); showAdminTab('accounts'); renderAdminAccounts();
+    } else {
+      byId('admin-office-search').value = ''; byId('admin-office-campus-filter').value = ''; byId('admin-office-status').value = '1';
+      byId('admin-office-coverage').value = key === 'active-offices' ? '' : key; adminPages.office = 1;
+      changeSection('admin'); showAdminTab('offices'); renderAdminOffices();
+    }
+  }
+  const campus = event.target.closest('[data-admin-campus]');
+  if (campus && isAdministrator()) {
+    byId('admin-office-search').value = ''; byId('admin-office-campus-filter').value = campus.dataset.adminCampus;
+    byId('admin-office-status').value = '1'; byId('admin-office-coverage').value = ''; adminPages.office = 1;
+    changeSection('admin'); showAdminTab('offices'); renderAdminOffices();
+  }
+  const documentType = event.target.closest('[data-admin-document-type]');
+  if (documentType && isAdministrator()) { event.preventDefault(); officeRouting.showDocumentType(documentType.dataset.adminDocumentType); }
+  if (event.target.closest('[data-admin-types-retry]') && isAdministrator()) loadAdmin();
   const adminNavigation = event.target.closest('[data-admin-nav]'); if (adminNavigation) { event.preventDefault(); changeSection('admin'); showAdminTab(adminNavigation.dataset.adminNav); }
   const editAccount = event.target.closest('[data-edit-account]'); if (editAccount) openAdminAccount(editAccount.dataset.editAccount);
   const editOffice = event.target.closest('[data-edit-office]'); if (editOffice) openAdminOffice(editOffice.dataset.editOffice);
@@ -959,6 +1018,8 @@ byId('status-filter').addEventListener('change', officeRouting.search);
 byId('origin-type').addEventListener('change', officeRouting.documentSource);
 byId('upload-form').addEventListener('submit', uploadDocument);
 byId('admin-office-form').addEventListener('submit', saveAdminOffice);
+byId('admin-overview-refresh').addEventListener('click', () => { clearNotice(); return loadAdmin(); });
+byId('admin-office-coverage').addEventListener('change', () => { adminPages.office = 1; renderAdminOffices(); });
 byId('admin-account-form').addEventListener('submit', saveAdminAccount);
 byId('admin-official-form').addEventListener('submit', saveAdminOfficial);
 byId('admin-delete-form').addEventListener('submit', confirmAdminDelete);

@@ -1,3 +1,6 @@
+import { normalizeDocumentType, getDocumentTypeColor, isTravelOrderType } from '../document-types.js';
+import { createTravelOverview } from '../travel-overview.js';
+
 // The API's offset-free routing timestamps are UTC, regardless of browser timezone.
 function routingTime(value) {
   if (!value) return NaN;
@@ -78,17 +81,33 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     complete: { title: 'Complete document', description: 'Close processing for this document. It will remain available in the timeline.', label: 'Mark completed' },
     deliver: { title: 'Record delivery', description: 'Record the recipient and delivery details. This finishes the document routing process.', label: 'Record delivery', required: true }
   };
-  const routing = { queue: 'all', page: 1, scope: '', counts: {}, pagination: { page: 1, pages: 1, total: 0 }, workspace: {}, detail: null };
+  const routing = { travelWindow: 'ongoing', documentType: '', queue: 'all', page: 1, scope: '', counts: {}, pagination: { page: 1, pages: 1, total: 0 }, workspace: {}, detail: null };
+  const selectedDocumentType = () => state.activeRole === 'admin' ? routing.documentType : '';
+  const isTravelRegistry = () => Boolean(selectedDocumentType()) && isTravelOrderType(selectedDocumentType());
+  const travelOverview = createTravelOverview({byId, escapeHtml, formatDate, statusBadge});
+  const documentTypeHash = reference => {
+    const base = reference ? '#admin/document/' + encodeURIComponent(reference) : '#admin/documents';
+    return base + '?type=' + encodeURIComponent(selectedDocumentType()) + (isTravelRegistry() && routing.travelWindow !== 'ongoing' ? '&travel=' + routing.travelWindow : '');
+  };
+  function clearDocumentType() {
+    routing.documentType = '';
+    routing.travelWindow = 'ongoing';
+    travelOverview.reset();
+    byId('section-documents').classList.remove('is-type-registry');
+  }
+  function setDocumentType(type, travelWindow = 'ongoing') {
+    if (state.activeRole !== 'admin' || typeof type !== 'string') return;
+    travelOverview.reset();
+    routing.documentType = type;
+    routing.travelWindow = ['ongoing', 'today', 'tomorrow', 'incoming', 'completed'].includes(travelWindow) ? travelWindow : 'ongoing';
+    routing.queue = 'all';
+    routing.scope = 'all';
+    byId('section-documents').classList.toggle('is-type-registry', Boolean(type));
+  }
   actions.decide = { title: 'Record PAD decision & return', description: 'Record the actual PAD decision and send the existing document back to Central Records. Central Records must confirm the hard-copy receipt.', label: 'Record decision & return' };
   const decisionLabels = { approved: 'Approved', disapproved: 'Disapproved', returned_for_correction: 'Returned for correction' };
   const senderRoles = { ovp_pad: 'OVP PAD', ovp_central_records: 'OVP Central Records', sksu_officials: 'SKSU Officials' };
   const receiptRemarks = ['Hard copy received.', 'Received for review.', 'Received for appropriate action.', 'Received for approval.', 'Received for signature.', 'Received for filing.'];
-  const documentTypeColors = new Map(Object.entries({
-    'ACTIVITY DESIGN': '#6244a3', 'EMAIL': '#2459a6', 'HAND CARRY': '#16744b',
-    'LOCAL COMMUNICATION': '#9a600d', 'OUTGOING COMMUNICATION': '#a3421f',
-    'PROJECT PROPOSAL': '#aa304c', 'TRAVEL ORDER': '#08758a',
-    'MEMORANDUM': '#536c26', 'GENERAL DOCUMENT': '#56616f'
-  }));
   const availableQueues = () => Object.entries(queues).filter(([, queue]) => !queue.role || queue.role === state.activeRole);
   const actionModal = new bootstrap.Modal(byId('routing-action-modal'));
   let request = 0;
@@ -185,19 +204,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   }
 
   function documentTypeBadge(document) {
-    const type = String(document.document_type || 'General document').trim().replace(/\s+/g, ' ').toUpperCase() || 'GENERAL DOCUMENT';
-    if (!documentTypeColors.has(type)) {
-      let hash = 0;
-      for (const character of type) hash = (Math.imul(hash, 31) + character.codePointAt(0)) >>> 0;
-      let hue = hash % 360;
-      let color = `hsl(${hue} 60% 32%)`;
-      while ([...documentTypeColors.values()].includes(color)) {
-        hue = (hue + 137.508) % 360;
-        color = `hsl(${hue.toFixed(3)} 60% 32%)`;
-      }
-      documentTypeColors.set(type, color);
-    }
-    return `<span class="routing-document-type" style="--document-type-color: ${documentTypeColors.get(type)}">${escapeHtml(type)}</span>`;
+    const type = normalizeDocumentType(document.document_type);
+    return `<span class="routing-document-type" style="--document-type-color: ${getDocumentTypeColor(type)}">${escapeHtml(type)}</span>`;
   }
 
   function canAct(document) {
@@ -263,22 +271,30 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     byId('routing-office-campus').textContent = office?.campus || '';
     byId('routing-office-campus').classList.toggle('d-none', !office?.campus);
     byId('routing-queue-office').textContent = label + (office?.campus ? ` · ${office.campus}` : '');
-    byId('routing-monitor-wrap').classList.toggle('d-none', !workspace.can_monitor);
+    byId('routing-monitor-wrap').classList.toggle('d-none', !workspace.can_monitor || Boolean(selectedDocumentType()));
     byId('routing-assignment-notice').classList.toggle('d-none', Boolean(state.user?.office_id));
     byId('routing-assignment-notice').textContent = state.activeRole === 'admin'
       ? 'Assign your account to an office in User accounts to send or receive office documents. You can monitor all offices and register outside documents through Records.'
       : 'Your account needs an office assignment before you can register, send, or receive office documents. Ask your administrator to assign your office.';
+    byId('document-search').placeholder = isTravelRegistry() ? 'Search employee, file code, destination, or purpose' : 'Search document number, particulars, type, or office';
     const title = queues[routing.queue];
-    byId('routing-queue-title').textContent = title.title;
-    byId('routing-queue-description').textContent = routing.queue === 'all' && workspace.can_read_all_timelines
+    byId('routing-view-kicker').textContent = selectedDocumentType() ? 'UNIVERSITY DOCUMENT REGISTRY' : 'OFFICE DOCUMENT ROUTING';
+    byId('routing-queue-title').textContent = selectedDocumentType() || title.title;
+    byId('routing-queue-description').textContent = selectedDocumentType()
+      ? 'All registered documents of this type across all offices. Search or filter by status, then open a document to view its timeline.'
+      : routing.queue === 'all' && workspace.can_read_all_timelines
       ? office ? 'Documents involving the selected office, with their complete routing history.' : 'Documents from all offices, with their complete routing history.'
       : title.description;
+    if (isTravelRegistry()) {
+      travelOverview.render(workspace.travel_summary, state.documents, routing.travelWindow);
+      byId('routing-queue-description').textContent = 'Explore travel schedules, employees, destinations, and departure and return dates across all offices.';
+    } else travelOverview.reset();
     const isReceivedQueue = ['attention', 'my_documents', 'received', 'for_approval', 'for_action'].includes(routing.queue);
-    byId('document-table-wrap').classList.toggle('d-none', isReceivedQueue);
+    byId('document-table-wrap').classList.toggle('d-none', isReceivedQueue || isTravelRegistry());
     byId('received-card-list').classList.toggle('d-none', !isReceivedQueue);
     const showLocation = routing.queue !== 'incoming';
     byId('document-table-head').innerHTML = `<th class="routing-file-column">File code / date</th><th class="routing-particular-column">Particular</th>${showLocation ? '<th>Current location / destination</th>' : ''}<th class="routing-status-column">Status</th><th class="admin-actions-column">Actions</th>`;
-    const rows = !isReceivedQueue ? state.documents.map(row).join('') || `<tr><td colspan="${showLocation ? 5 : 4}" class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>No documents in this queue.</td></tr>` : '';
+    const rows = !isReceivedQueue ? state.documents.map(row).join('') || `<tr><td colspan="${showLocation ? 5 : 4}" class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>${selectedDocumentType() ? 'No matching documents for this type.' : 'No documents in this queue.'}</td></tr>` : '';
     byId('document-list').innerHTML = rows;
     const cards = isReceivedQueue ? state.documents.map(receivedCard).join('') || '<div class="text-center text-muted py-5"><i class="bx bx-folder-open fs-2 d-block mb-2"></i>No documents in this queue.</div>' : '';
     byId('received-card-list').innerHTML = cards;
@@ -299,6 +315,11 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   function updateNavigation() {
     const visible = !byId('section-documents').classList.contains('d-none') || !byId('section-track').classList.contains('d-none');
     byId('routing-review-nav-group').classList.toggle('d-none', !availableQueues().some(([, queue]) => queue.role));
+    document.querySelectorAll('[data-admin-document-type]').forEach(button => {
+      const selected = visible && state.activeRole === 'admin' && button.dataset.adminDocumentType === selectedDocumentType();
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-current', selected ? 'page' : 'false');
+    });
     document.querySelectorAll('[data-routing-queue]').forEach((item) => {
       const queue = queues[item.dataset.routingQueue];
       item.classList.toggle('d-none', Boolean(queue?.role && queue.role !== state.activeRole));
@@ -332,11 +353,13 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
 
   function setLoading(loading) {
     ['document-list', 'received-card-list', 'overview-documents'].forEach((id) => byId(id).setAttribute('aria-busy', String(loading)));
+    travelOverview.setLoading(isTravelRegistry(), loading, routing.travelWindow);
     if (!loading) return;
     const cards = ['attention', 'my_documents', 'received', 'for_approval', 'for_action'].includes(routing.queue);
-    byId('routing-queue-title').textContent = queues[routing.queue].title;
+    byId('routing-queue-title').textContent = selectedDocumentType() || queues[routing.queue].title;
+    byId('routing-view-kicker').textContent = selectedDocumentType() ? 'UNIVERSITY DOCUMENT REGISTRY' : 'OFFICE DOCUMENT ROUTING';
     byId('routing-queue-description').textContent = 'Loading the latest documents for this queue…';
-    byId('document-table-wrap').classList.toggle('d-none', cards);
+    byId('document-table-wrap').classList.toggle('d-none', cards || isTravelRegistry());
     byId('received-card-list').classList.toggle('d-none', !cards);
     const markup = loadingMarkup('Loading documents…');
     byId('document-list').innerHTML = `<tr><td colspan="5">${markup}</td></tr>`;
@@ -357,6 +380,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     workspaceController = controller;
     const params = new URLSearchParams({ queue: routing.queue, page: String(routing.page), search: overviewVisible ? byId('overview-search').value || '' : byId('document-search').value || '', status: overviewVisible ? '' : byId('status-filter').value || '' });
     if (routing.scope) params.set('office_id', routing.scope);
+    if (selectedDocumentType()) params.set('document_type', selectedDocumentType());
+    if (isTravelRegistry()) params.set('travel_window', routing.travelWindow);
     setLoading(true);
     try {
       const [offices, workspace] = await Promise.all([loadOffices(), api(`/api/routing/workspace?${params}`, { signal: controller.signal })]);
@@ -375,6 +400,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
       apiState(false);
       showNotice(error.message);
       const markup = '<div class="routing-load-state flex-column" role="alert"><span>Documents could not be loaded.</span><button type="button" class="btn btn-sm btn-outline-primary" data-retry-documents>Try again</button></div>';
+      if (isTravelRegistry()) travelOverview.fail();
       byId('document-list').innerHTML = `<tr><td colspan="5">${markup}</td></tr>`;
       byId('received-card-list').innerHTML = markup;
       byId('overview-documents').innerHTML = markup;
@@ -392,6 +418,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   async function showQueue(queue) {
     if (queue === 'pad_results') queue = 'incoming';
     if (!availableQueues().some(([key]) => key === queue)) queue = 'all';
+    clearDocumentType();
     clearFilters();
     if (queue !== routing.queue && (queue === 'all' || routing.queue === 'all')) routing.scope = '';
     routing.queue = queue;
@@ -401,7 +428,30 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     await refresh();
   }
 
-  function overview() { clearFilters(); byId('overview-search').value = ''; routing.scope = ''; routing.queue = 'attention'; return refresh(); }
+  async function showDocumentType(type) {
+    if (state.activeRole !== 'admin' || !type) return;
+    clearFilters();
+    detailRequest++;
+    setDocumentType(type);
+    changeSection('documents');
+    window.history.replaceState(null, '', documentTypeHash());
+    byId('routing-queue-title').focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    updateNavigation();
+    await refresh();
+  }
+
+  async function showTravelWindow(period) {
+    if (!isTravelRegistry() || !['ongoing', 'today', 'tomorrow', 'incoming', 'completed'].includes(period)) return;
+    clearFilters();
+    detailRequest++;
+    routing.travelWindow = period;
+    changeSection('documents');
+    window.history.replaceState(null, '', documentTypeHash());
+    await refresh();
+  }
+
+  function overview() { clearDocumentType(); clearFilters(); byId('overview-search').value = ''; routing.scope = ''; routing.queue = 'attention'; return refresh(); }
 
   function additionalDetails(data) {
     const travel = data.travel_details;
@@ -527,7 +577,7 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
   async function openDocument(reference) {
     const current = ++detailRequest;
     changeSection('track');
-    window.history.replaceState(null, '', `#${prefix()}/document/${encodeURIComponent(reference)}`);
+    window.history.replaceState(null, '', selectedDocumentType() ? documentTypeHash(reference) : `#${prefix()}/document/${encodeURIComponent(reference)}`);
     updateNavigation();
     byId('document-detail').className = 'card document-timeline';
     byId('document-detail').innerHTML = '<div class="card-body text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading document timeline…</div>';
@@ -879,11 +929,14 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     byId('overview-documents').innerHTML = '<div class="text-center text-muted py-5">Loading received documents…</div>';
     byId('overview-document-count').textContent = ''; byId('overview-office').textContent = '';
     registrationOptions = { document_types: [], personnel: [], source_divisions: [] };
+    clearDocumentType();
     routing.queue = 'all'; routing.page = 1; routing.scope = ''; routing.detail = null; routing.workspace = {}; routing.counts = {};
     actionPending = null; submissionKey = null; actionModal.hide();
   }
 
   function handleClick(event) {
+    const travelPeriod = event.target.closest('[data-travel-window]');
+    if (travelPeriod) { showTravelWindow(travelPeriod.dataset.travelWindow); return; }
     if (event.target.closest('[data-retry-documents]')) { refresh(); return; }
     const attentionPage = event.target.closest('[data-attention-page]');
     if (attentionPage && !attentionPage.disabled) { routing.page += Number(attentionPage.dataset.attentionPage); refresh(); return; }
@@ -903,7 +956,8 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     const page = event.target.closest('[data-routing-page]');
     if (page && !page.disabled) { routing.page += Number(page.dataset.routingPage); refresh(); }
     if (event.target.closest('[data-back-to-queue]')) {
-      if (routing.queue === 'attention') { changeSection('dashboard'); overview(); }
+      if (selectedDocumentType()) { changeSection('documents'); window.history.replaceState(null, '', documentTypeHash()); updateNavigation(); refresh(); }
+      else if (routing.queue === 'attention') { changeSection('dashboard'); overview(); }
       else showQueue(routing.queue);
     }
   }
@@ -931,6 +985,6 @@ export function createDocRouter({ state, api, byId, escapeHtml, formatDate, show
     searchTimer = setTimeout(refresh, 250);
   }
 
-  return { refresh, render, row, openDocument, openUpload, uploadDocument, reset, handleClick, bind, search, documentSource, overview, showQueue, updateNavigation, invalidateOffices,
-    currentQueue: () => routing.queue, setQueue: (queue) => { if (queue === 'pad_results') queue = 'incoming'; if (availableQueues().some(([key]) => key === queue)) routing.queue = queue; } };
+  return { refresh, render, row, openDocument, openUpload, uploadDocument, reset, handleClick, bind, search, documentSource, overview, showQueue, showDocumentType, setDocumentType, clearDocumentType, documentTypeHash, updateNavigation, invalidateOffices,
+    currentDocumentType: selectedDocumentType, currentQueue: () => routing.queue, setQueue: (queue) => { if (queue === 'pad_results') queue = 'incoming'; if (availableQueues().some(([key]) => key === queue)) routing.queue = queue; } };
 }

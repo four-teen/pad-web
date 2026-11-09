@@ -82,3 +82,13 @@ test('a failed refresh hides old figures and shows the server validation error',
   assert.match(app.byId('statistics-error').textContent, /Start date/);
   assert.equal(app.byId('statistics-apply').disabled, false);
 });
+
+
+test('a selected zero-count document type stays selected even when absent from historical type names', async () => {
+  const calls=[];
+  const app=page(async path=>{calls.push(path);const report=fixture();report.filters.document_type='Unused Type';report.snapshot.total_documents=0;report.type_breakdown=[];return report;});
+  await app.stats.selectType('Unused Type');
+  assert.equal(new URL(calls[0],'https://pad.test').searchParams.get('document_type'),'Unused Type');
+  assert.equal(app.byId('statistics-type').value,'Unused Type');
+  assert.match(app.byId('statistics-type').innerHTML,/Unused Type/);
+});

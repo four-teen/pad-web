@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../src/doc_router/index.js', import.meta.url), 'utf8').replace('export function createDocRouter', 'function createDocRouter');
+const source = readFileSync(new URL('../src/doc_router/index.js', import.meta.url), 'utf8').replace('export function createDocRouter', 'function createDocRouter').replace(/^import .*;$/gm, '');
 const context = vm.createContext({ Date });
 vm.runInContext(source, context);
 const timeline = (data) => context.custodyTimeline(data);

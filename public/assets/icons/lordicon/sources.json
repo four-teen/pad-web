@@ -1,0 +1,104 @@
+{
+  "attribution": "Animated icons by Lordicon.com",
+  "attribution_url": "https://lordicon.com/",
+  "license": "https://lordicon.com/docs/license/free",
+  "assets": [
+    {
+      "file": "18-location-pin.json",
+      "page": "https://lordicon.com/icons/wired/outline/18-location-pin",
+      "source": "https://media.lordicon.com/icons/wired/outline/18-location-pin.li",
+      "plan": "FREE",
+      "states": [
+        "in-jump-dynamic",
+        "in-roll-calm",
+        "default:hover-jump",
+        "hover-jump-roll",
+        "hover-roll",
+        "loop-roll"
+      ]
+    },
+    {
+      "file": "45-clock-time.json",
+      "page": "https://lordicon.com/icons/wired/outline/45-clock-time",
+      "source": "https://media.lordicon.com/icons/wired/outline/45-clock-time.li",
+      "plan": "FREE",
+      "states": [
+        "in-reveal",
+        "default:hover-pinch",
+        "hover-oscillate",
+        "loop-oscillate"
+      ]
+    },
+    {
+      "file": "27-globe.json",
+      "page": "https://lordicon.com/icons/wired/outline/27-globe",
+      "source": "https://media.lordicon.com/icons/wired/outline/27-globe.li",
+      "plan": "FREE",
+      "states": [
+        "in-reveal",
+        "default:hover-rotate",
+        "hover-rotate-up-to-down",
+        "loop-rotate"
+      ]
+    },
+    {
+      "file": "37-check.json",
+      "page": "https://lordicon.com/icons/wired/outline/37-check",
+      "source": "https://media.lordicon.com/icons/wired/outline/37-check.li",
+      "plan": "FREE",
+      "states": [
+        "in-reveal",
+        "default:hover-pinch",
+        "hover-wobble",
+        "hover-loading"
+      ]
+    },
+    {
+      "file": "177-envelope-send.json",
+      "page": "https://lordicon.com/icons/wired/outline/177-envelope-send",
+      "source": "https://media.lordicon.com/icons/wired/outline/177-envelope-send.li",
+      "plan": "FREE",
+      "states": [
+        "in-assembly",
+        "in-unfold",
+        "default:hover-flying",
+        "loop-flying"
+      ]
+    },
+    {
+      "file": "12-layers.json",
+      "page": "https://lordicon.com/icons/wired/outline/12-layers",
+      "source": "https://media.lordicon.com/icons/wired/outline/12-layers.li",
+      "plan": "FREE",
+      "states": [
+        "in-reveal",
+        "default:hover-slide",
+        "hover-squeeze"
+      ]
+    },
+    {
+      "file": "56-file-text.json",
+      "page": "https://lordicon.com/icons/wired/outline/56-file-text",
+      "source": "https://media.lordicon.com/icons/wired/outline/56-file-text.li",
+      "plan": "FREE",
+      "states": [
+        "in-reveal",
+        "in-unfold",
+        "default:hover-swipe",
+        "hover-unfold"
+      ]
+    },
+    {
+      "file": "49-plus-circle.json",
+      "page": "https://lordicon.com/icons/wired/outline/49-plus-circle",
+      "source": "https://media.lordicon.com/icons/wired/outline/49-plus-circle.li",
+      "plan": "FREE",
+      "states": [
+        "in-reveal",
+        "default:hover-rotation",
+        "hover-swirl",
+        "morph-minus"
+      ]
+    }
+  ]
+}
